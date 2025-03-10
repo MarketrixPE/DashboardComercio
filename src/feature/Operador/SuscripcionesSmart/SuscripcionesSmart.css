@@ -1,0 +1,199 @@
+/* Animaciones para burbujas flotantes */
+@keyframes float1 {
+    0% { transform: translate(0, 0); }
+    25% { transform: translate(10px, 15px); }
+    50% { transform: translate(5px, 25px); }
+    75% { transform: translate(-10px, 15px); }
+    100% { transform: translate(0, 0); }
+  }
+  
+  @keyframes float2 {
+    0% { transform: translate(0, 0); }
+    25% { transform: translate(-15px, 10px); }
+    50% { transform: translate(-20px, -15px); }
+    75% { transform: translate(-5px, -25px); }
+    100% { transform: translate(0, 0); }
+  }
+  
+  @keyframes float3 {
+    0% { transform: translate(0, 0); }
+    25% { transform: translate(15px, 15px); }
+    50% { transform: translate(25px, 25px); }
+    75% { transform: translate(15px, 15px); }
+    100% { transform: translate(0, 0); }
+  }
+  
+  /* Estilos para burbujas del plan GOLD */
+  .gold-bubble-1 {
+    position: absolute;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background-color: #f59e0b;
+    opacity: 0.2;
+    filter: blur(20px);
+    top: 10%;
+    right: 10%;
+    animation: float1 6s ease-in-out infinite;
+  }
+  
+  .gold-bubble-2 {
+    position: absolute;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background-color: #f59e0b;
+    opacity: 0.15;
+    filter: blur(15px);
+    bottom: 20%;
+    left: 5%;
+    animation: float3 7s ease-in-out infinite;
+  }
+  
+  .gold-bubble-3 {
+    position: absolute;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: #fbbf24;
+    opacity: 0.15;
+    filter: blur(10px);
+    top: 40%;
+    right: 25%;
+    animation: float2 5s ease-in-out infinite;
+  }
+  
+  /* Estilos para burbujas del plan INFINITY */
+  .infinity-bubble-1 {
+    position: absolute;
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    background-color: #3b82f6;
+    opacity: 0.2;
+    filter: blur(20px);
+    top: 5%;
+    left: 8%;
+    animation: float2 6s ease-in-out infinite;
+  }
+  
+  .infinity-bubble-2 {
+    position: absolute;
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    background-color: #6366f1;
+    opacity: 0.15;
+    filter: blur(15px);
+    bottom: 15%;
+    right: 10%;
+    animation: float1 8s ease-in-out infinite;
+  }
+  
+  .infinity-bubble-3 {
+    position: absolute;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background-color: #4f46e5;
+    opacity: 0.15;
+    filter: blur(10px);
+    top: 50%;
+    left: 15%;
+    animation: float3 5s ease-in-out infinite;
+  }
+  
+  .infinity-bubble-4 {
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background-color: #3b82f6;
+    opacity: 0.2;
+    filter: blur(8px);
+    top: 25%;
+    right: 20%;
+    animation: float2 4s ease-in-out infinite;
+  }
+  
+  /* Estilos para burbujas del plan EMPRESARIAL */
+  .empresarial-bubble-1 {
+    position: absolute;
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background-color: #8b5cf6;
+    opacity: 0.2;
+    filter: blur(25px);
+    top: 5%;
+    right: 10%;
+    animation: float1 7s ease-in-out infinite;
+  }
+  
+  .empresarial-bubble-2 {
+    position: absolute;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background-color: #a855f7;
+    opacity: 0.15;
+    filter: blur(20px);
+    bottom: 10%;
+    left: 15%;
+    animation: float3 8s ease-in-out infinite;
+  }
+  
+  .empresarial-bubble-3 {
+    position: absolute;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background-color: #9333ea;
+    opacity: 0.15;
+    filter: blur(15px);
+    top: 40%;
+    left: 10%;
+    animation: float2 6s ease-in-out infinite;
+  }
+  
+  .empresarial-bubble-4 {
+    position: absolute;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: #8b5cf6;
+    opacity: 0.2;
+    filter: blur(12px);
+    top: 30%;
+    right: 25%;
+    animation: float1 5s ease-in-out infinite;
+  }
+  
+  /* Efecto hover para las tarjetas */
+  .card-hover:hover .gold-bubble-1,
+  .card-hover:hover .gold-bubble-2,
+  .card-hover:hover .gold-bubble-3,
+  .card-hover:hover .infinity-bubble-1,
+  .card-hover:hover .infinity-bubble-2,
+  .card-hover:hover .infinity-bubble-3,
+  .card-hover:hover .infinity-bubble-4,
+  .card-hover:hover .empresarial-bubble-1,
+  .card-hover:hover .empresarial-bubble-2,
+  .card-hover:hover .empresarial-bubble-3,
+  .card-hover:hover .empresarial-bubble-4 {
+    opacity: 0.3;
+  }
+
+  .seleccionado-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background-color: #3c50e0;
+    color: white;
+    border-radius: 9999px;
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    line-height: 1;
+    z-index: 10;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  }

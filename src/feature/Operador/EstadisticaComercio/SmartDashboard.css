@@ -1,0 +1,9 @@
+/* Para ocultar la barra de desplazamiento pero mantener la funcionalidad */
+.hide-scrollbar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE y Edge */
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari y Opera */
+}

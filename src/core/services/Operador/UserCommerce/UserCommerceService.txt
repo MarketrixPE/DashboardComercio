@@ -1,0 +1,88 @@
+// services/commerce.service.ts
+import { useState } from "react";
+import { commerceClient } from "../../../Interceptors/apiClient";
+
+export interface CommerceCreateData {
+  email: string;
+  password: string;
+  password_confirmation: string;
+  phone: string;
+  alias: string;
+  numero_documento: string;
+  fecha_nacimiento: string;
+  genero: "M" | "F";
+  departamento: string;
+  provincia: string;
+  distrito: string;
+  referal_code?: string;
+}
+
+
+
+export const createCommerce = async (commerceData: CommerceCreateData): Promise<any> => {
+  try {
+    console.log('Datos enviados:', commerceData); // Log de datos enviados
+
+    const response = await commerceClient.post(
+      `${import.meta.env.VITE_URL_API_BASE}/registerCommerce`,
+      commerceData
+    );
+
+    return response.data;
+  } catch (error: any) {
+    console.log('Error completo:', error); // Log del error completo
+
+    if (error.response) {
+      console.log('Status:', error.response.status); // Log del status
+      console.log('Data:', error.response.data);     // Log de la data del error
+      console.log('Headers:', error.response.headers); // Log de headers
+
+      if (error.response.status === 422) {
+        const validationErrors = error.response.data.errors;
+        console.log('Errores de validación:', validationErrors); // Log específico de validación
+        throw new Error(
+          typeof validationErrors === 'object' 
+            ? Object.values(validationErrors).flat().join(', ')
+            : 'Error de validación'
+        );
+      }
+
+      // Mensaje de error más detallado
+      throw new Error(
+        `Error ${error.response.status}: ${
+          error.response.data.message || 
+          JSON.stringify(error.response.data) ||
+          'Error desconocido'
+        }`
+      );
+    } else if (error.request) {
+      console.log('Error de request:', error.request); // Log del request
+      throw new Error("No se recibió respuesta del servidor");
+    } else {
+      console.log('Error de configuración:', error.message); // Log de error de config
+      throw new Error(`Error al procesar la solicitud: ${error.message}`);
+    }
+  }
+};
+
+export const useCommerceCreation = () => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const createNewCommerce = async (commerceData: CommerceCreateData) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const result = await createCommerce(commerceData);
+      setIsLoading(false);
+      return result;
+    } catch (err: any) {
+      setIsLoading(false);
+      setError(err.message);
+      throw err;
+    }
+  };
+
+  return { createNewCommerce, isLoading, error };
+};

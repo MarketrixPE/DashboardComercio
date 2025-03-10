@@ -1,0 +1,211 @@
+import React, { useState } from "react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer
+} from 'recharts';
+
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
+
+export interface SurveyStatsProps {
+  stats: {
+    total_preguntas: number;
+    rango_edades: {
+      [key: string]: number;
+    };
+    total_respuestas: {
+      female_respuestas: number;
+      male_respuestas: number;
+    };
+    respuestas_por_distrito: {
+      id: number;
+      nombre: string;
+      cantidad_respuestas: number;
+    }[];
+  };
+}
+
+export const SurveyStatsView = ({ stats }: SurveyStatsProps) => {
+  const [activeTab, setActiveTab] = useState("estadistica");
+
+  // Calcular porcentajes para rangos de edades
+  const totalEdades = Object.values(stats.rango_edades).reduce((acc, curr) => acc + curr, 0);
+  const edadesConPorcentaje = Object.entries(stats.rango_edades).map(
+    ([range, value]) => ({
+      name: range,
+      value: value,
+      porcentaje: totalEdades > 0 ? (value / totalEdades) * 100 : 0,
+    })
+  );
+
+  // Calcular porcentajes para género
+  const totalGenero = stats.total_respuestas.female_respuestas + stats.total_respuestas.male_respuestas;
+  const generoData = [
+    { 
+      name: "Mujer", 
+      value: stats.total_respuestas.female_respuestas,
+      porcentaje: totalGenero > 0 ? (stats.total_respuestas.female_respuestas / totalGenero) * 100 : 0
+    },
+    { 
+      name: "Hombre", 
+      value: stats.total_respuestas.male_respuestas,
+      porcentaje: totalGenero > 0 ? (stats.total_respuestas.male_respuestas / totalGenero) * 100 : 0
+    },
+  ];
+
+  // Calcular porcentajes para distritos
+  const totalDistritos = stats.respuestas_por_distrito.reduce((acc, curr) => acc + curr.cantidad_respuestas, 0);
+  const distritosData = stats.respuestas_por_distrito.map((distrito) => ({
+    name: distrito.nombre,
+    value: distrito.cantidad_respuestas,
+    porcentaje: totalDistritos > 0 ? (distrito.cantidad_respuestas / totalDistritos) * 100 : 0,
+  }));
+
+  // Ordenar los rangos de edad para presentarlos correctamente
+  const ordenRangosEdad: Record<string, number> = {
+    "0-18": 1,
+    "19-30": 2,
+    "31-45": 3,
+    "46-55": 4,
+    "56-70": 5,
+    "71 a +": 6
+  };
+
+  const edadesOrdenadas = [...edadesConPorcentaje].sort((a, b) => {
+    return (ordenRangosEdad[a.name] || 99) - (ordenRangosEdad[b.name] || 99);
+  });
+
+  return (
+    <div className="w-full bg-white dark:bg-boxdark rounded-lg shadow-md">
+      {/* Encabezado con nombre de encuesta y botón atrás */}
+      <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center">
+        <button 
+          onClick={() => window.history.back()} 
+          className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 mr-4"
+        >
+          <i className="fas fa-arrow-left"></i>
+        </button>
+        <h2 className="text-xl font-bold text-gray-800 dark:text-white">Encuesta Smart</h2>
+      </div>
+
+      {/* Navegación en pestañas */}
+      <div className="flex border-b border-gray-200 dark:border-gray-700">
+        <button
+          className={`flex-1 py-3 px-4 text-center font-medium ${
+            activeTab === "estadistica"
+              ? "text-blue-600 border-b-2 border-blue-600 dark:text-blue-500 dark:border-blue-500"
+              : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+          }`}
+          onClick={() => setActiveTab("estadistica")}
+        >
+          Estadística
+        </button>
+        <button
+          className={`flex-1 py-3 px-4 text-center font-medium ${
+            activeTab === "preguntas"
+              ? "text-blue-600 border-b-2 border-blue-600 dark:text-blue-500 dark:border-blue-500"
+              : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+          }`}
+          onClick={() => setActiveTab("preguntas")}
+        >
+          Preguntas
+        </button>
+      </div>
+
+      {/* Contenido de la pestaña de estadísticas */}
+      {activeTab === "estadistica" && (
+        <div className="p-4">
+          {/* Rangos de Edad */}
+          <div className="mb-8">
+            <h3 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white">
+              Rangos de Edad
+            </h3>
+            <div className="space-y-4">
+              {edadesOrdenadas.map((edad) => (
+                <div key={edad.name} className="flex items-center justify-between">
+                  <div className="w-24">{edad.name}</div>
+                  <div className="flex-1 mx-4">
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4">
+                      <div
+                        className="bg-blue-400 h-4 rounded-full"
+                        style={{ width: `${edad.porcentaje}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                  <div className="w-24 text-right">
+                    {edad.value} ({edad.porcentaje.toFixed(1)}%)
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Distribución por Género */}
+        <div className="p-4 bg-gray-50 dark:bg-boxdark-2 rounded-lg">
+          <h3 className="text-lg font-semibold mb-2 text-black dark:text-white">Distribución por Género</h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={generoData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  paddingAngle={5}
+                  dataKey="value"
+                  label={({name, value}) => `${name}: ${value}`}
+                >
+                  {generoData.map((_entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+          {/* Respuestas por Distrito */}
+        <div className="p-4 bg-gray-50 dark:bg-boxdark-2 rounded-lg">
+          <h3 className="text-lg font-semibold mb-2 text-black dark:text-white">Respuestas por Distrito</h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={distritosData} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis type="number" />
+                <YAxis dataKey="name" type="category" width={100} />
+                <Tooltip />
+                <Bar dataKey="value" fill="#8884d8">
+                  {distritosData.map((_entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+        </div>
+      )}
+
+      {/* Contenido de la pestaña de preguntas - vacío por ahora */}
+      {activeTab === "preguntas" && (
+        <div className="p-4">
+          <p className="text-center text-gray-500 dark:text-gray-400 py-8">
+            La funcionalidad de preguntas estará disponible próximamente.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default SurveyStatsView;

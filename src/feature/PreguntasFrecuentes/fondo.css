@@ -1,0 +1,8 @@
+.fondo {
+    background-image: url('https://servicios.puntossmart.com/img/logoFondoTrans.png');
+    background-repeat: no-repeat;
+    background-position: bottom;
+    display: block;
+    background-position-y: center;
+  }
+  
