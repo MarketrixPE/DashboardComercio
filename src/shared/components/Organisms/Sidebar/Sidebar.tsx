@@ -16,10 +16,8 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
   const sidebar = useRef<HTMLDivElement | null>(null);
 
   // Determinar rol dinámicamente desde localStorage
-  const commerceRole = localStorage.getItem("commerce_role");
-  const adminRole = localStorage.getItem("role");
-  const role =
-    commerceRole === "2" ? "commerce" : adminRole === "3" ? "admin" : null;
+  const userRole = localStorage.getItem("user_role");
+  const role = userRole === "2" ? "commerce" : userRole === "3" ? "branch_manager" : null;
 
   const storedSidebarExpanded = localStorage.getItem("sidebar-expanded");
   const [sidebarExpanded, setSidebarExpanded] = useState(
@@ -59,7 +57,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
   }, [sidebarExpanded]);
 
   return (
-<div className="animate__animated animate__fadeInLeft animate__delay-500ms animate__duration-1000ms mr-4 w-0 lg:w-[20%] z-9999">
+    <div className="animate__animated animate__fadeInLeft animate__delay-500ms animate__duration-1000ms mr-4 w-0 lg:w-[20%] z-9999">
       <aside
         ref={sidebar}
         className={`absolute left-0 top-0 z-9999 flex h-[96vh] w-72.5 rounded-tr-[1rem] rounded-[1rem]
@@ -98,7 +96,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
         <div className="no-scrollbar flex flex-col overflow-y-auto duration-300 ease-linear">
           <nav className="mt-5 py-4 px-4 lg:mt-9 lg:px-6">
             <aside className="sidebar">
-              {role === "admin" && (
+              {role === "branch_manager" && (
                 <AdminMenu
                   pathname={pathname}
                   sidebarExpanded={sidebarExpanded}

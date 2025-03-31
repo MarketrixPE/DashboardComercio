@@ -4,7 +4,6 @@ import "./SignUp.css";
 import { useNavigate } from "react-router-dom";
 import { useUserRole } from "../../../core/utils/UserRoleContext";
 import { login } from "../../../core/services/AuthService";
-import { decryptCompanyId } from "../../../core/services/Operador/DecryptCompanyId";
 import { clearLocalStorage } from "../../../core/Interceptors/apiClient";
 import Uploader from "../../../shared/components/Atoms/Uploader";
 import Swal from "sweetalert2";
@@ -438,17 +437,19 @@ const SignUp: React.FC = () => {
 
       try {
         setIsLoading(true);
-        const data = await login(email, password, "commerce");
-
-        if (data.company_id) {
-          const decryptedCompanyId = await decryptCompanyId(data.company_id);
-          localStorage.setItem("decrypted_company_id", decryptedCompanyId);
-        }
-
-        const role = data.role === 2 ? "commerce" : "admin";
-        setRole(role);
+        const data = await login(email, password);
+        const role =
+          data.role === 2
+            ? "commerce"
+            : data.role === 3
+            ? "branch_manager"
+            : "commerce";
+        setRole(role === "branch_manager" ? "commerce" : role);
         setShowThanks(true);
-        setTimeout(() => navigate("/mi-dashboard"), 2000);
+
+        const dashboard =
+          data.role === 3 ? "/dashboard-sucursal" : "/mi-dashboard";
+        setTimeout(() => navigate(dashboard));
       } catch (err: any) {
         if (err.message === "Verifique su Correo") {
           setError("Verifique su Correo");
@@ -786,10 +787,10 @@ const SignUp: React.FC = () => {
           <div
             className={`relative w-[27rem] items-center h-[400px] perspective-1000 transition-all duration-500 
                         max-[767px]:absolute max-[767px]:z-[99] max-[767px]:flex max-[767px]:justify-cente max-[767px]:justify-center  ${
-              showCard
-                ? "opacity-100 translate-x-0"
-                : "opacity-0 translate-x-20 pointer-events-none"
-            }`}
+                          showCard
+                            ? "opacity-100 translate-x-0"
+                            : "opacity-0 translate-x-20 pointer-events-none"
+                        }`}
           >
             <div
               className={`card ${
@@ -845,6 +846,7 @@ const SignUp: React.FC = () => {
                     error={errors.password}
                     placeholder="Contraseña"
                     required
+                    autocomplete="current-password"
                   />
                   <button type="submit" className="btn" disabled={isLoading}>
                     {isLoading ? (
@@ -969,6 +971,7 @@ const SignUp: React.FC = () => {
                           error={errors.password}
                           placeholder="Contraseña"
                           required
+                          autocomplete="current-password"
                         />
                         <InputField
                           label="Confirmar Contraseña"

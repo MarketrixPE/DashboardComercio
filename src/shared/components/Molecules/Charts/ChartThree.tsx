@@ -1,8 +1,8 @@
 import { ApexOptions } from "apexcharts";
 import React, { useState, useEffect } from "react";
 import ReactApexChart from "react-apexcharts";
-import GeneralService from "../../../../core/services/GeneralService";
-import { TIME_FRAMES } from "../../../../feature/Operador/EstadisticaComercio/fakeDataService";
+import { HelperService } from "../../../../core/services/HelperService";
+import { TIME_FRAMES } from "../../../hooks/useMetrics";
 
 
 // Definimos la estructura de datos para el gráfico
@@ -26,7 +26,7 @@ const ChartThree: React.FC<ChartThreeProps> = ({ timeFrame = TIME_FRAMES.TODAY }
     { gender: "Hombres", count: 2100, percentage: 56, color: "#0FADCF" }
   ]);
   const [loading, setLoading] = useState(false);
-  const userId = GeneralService.getUserId();
+  const userId = HelperService.getUserUuid();
 
   // Opciones del gráfico
   const options: ApexOptions = {
@@ -201,12 +201,6 @@ const ChartThree: React.FC<ChartThreeProps> = ({ timeFrame = TIME_FRAMES.TODAY }
             </p>
           </div>
         ))}
-      </div>
-      
-      {/* Total Count */}
-      <div className="mt-4 text-center text-sm text-gray-500 dark:text-gray-400">
-        Total: {loading ? "..." : 
-          genderData.reduce((acc, item) => acc + item.count, 0).toLocaleString()} usuarios
       </div>
     </div>
   );

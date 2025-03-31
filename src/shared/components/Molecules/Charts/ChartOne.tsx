@@ -4,7 +4,7 @@ import ReactApexChart from "react-apexcharts";
 
 export interface PointsTrend {
   date: string;
-  total_points: string;
+  total_points: number;
 }
 
 interface ChartOneProps {
@@ -12,7 +12,6 @@ interface ChartOneProps {
 }
 
 const ChartOne: React.FC<ChartOneProps> = ({ data }) => {
-  // Procesar los datos para el gráfico
   const processedData = {
     dates: data.map((item) => {
       const date = new Date(item.date);
@@ -21,7 +20,7 @@ const ChartOne: React.FC<ChartOneProps> = ({ data }) => {
         month: "short",
       });
     }),
-    points: data.map((item) => parseInt(item.total_points)),
+    points: data.map((item) => item.total_points),
   };
 
   const options: ApexOptions = {
@@ -43,7 +42,6 @@ const ChartOne: React.FC<ChartOneProps> = ({ data }) => {
         left: 0,
         opacity: 0.1,
       },
-
       toolbar: {
         show: false,
       },

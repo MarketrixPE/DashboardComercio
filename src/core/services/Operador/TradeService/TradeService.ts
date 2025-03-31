@@ -17,86 +17,36 @@ const handleApiError = (error: any, defaultMessage: string): never => {
 };
 
 /**
- * Obtener empresa asociada a un usuario por su ID
+ * Obtener detalles de una empresa por su ID encriptado
+ * Utilizando el endpoint POST /companies/show-encrypted
  */
-export const getCompanyByUser = async (userId: number) => {
-  if (!userId) {
-    throw new Error("El userId es obligatorio.");
+export const getCompanyDetails = async (encryptedId: string): Promise<Company> => {
+  if (!encryptedId) {
+    throw new Error("El ID encriptado de la empresa es obligatorio.");
   }
 
   try {
-    const { data } = await commerceClient.get(
-      `${API_BASE_URL}/company-by-user/${userId}`
+    const { data } = await commerceClient.post(
+      `${API_BASE_URL}/companies/show-encrypted`,
+      { company_id: encryptedId }
     );
-    return data.data;
-  } catch (error) {
-    handleApiError(error, "Error al obtener la empresa por usuario.");
-  }
-};
-
-/**
- * Obtener detalles de una empresa por su ID
- */
-export const getCompanyById = async (id: number): Promise<Company> => {
-  if (!id) {
-    throw new Error("El ID de la empresa es obligatorio.");
-  }
-
-  try {
-    const { data } = await commerceClient.get(`${API_BASE_URL}/company/${id}`);
-    if (data.success && data.data.length > 0) {
-      return data.data[0];
+    
+    if (data.success && data.data) {
+      return data.data;
     }
+    
     throw new Error("No se encontró la empresa solicitada.");
   } catch (error) {
-    handleApiError(error, "Error al obtener los detalles de la empresa.");
-    throw error;
+    return handleApiError(error, "Error al obtener los detalles de la empresa.");
   }
 };
-
-
-export const createCompany = async (companyData: {
-  tipo_documento: string;
-  numero_documento: string;
-  razon_social: string;
-  nombre_comercial: string;
-  numeros_contacto: string;
-  activo: number;
-  user_role_commerce: number;
-  logo: File | null;
-  membership_id: number;
-  discount_plan_id: number;
-}): Promise<void> => {
-  const formData = new FormData();
-
-  formData.append("tipo_documento", companyData.tipo_documento);
-  formData.append("numero_documento", companyData.numero_documento);
-  formData.append("razon_social", companyData.razon_social);
-  formData.append("nombre_comercial", companyData.nombre_comercial);
-  formData.append("numeros_contacto", companyData.numeros_contacto || "");
-  formData.append("activo", companyData.activo.toString());
-  formData.append("user_role_commerce", companyData.user_role_commerce.toString());
-  formData.append("membership_id", companyData.membership_id.toString());
-  formData.append("discount_plan_id", companyData.discount_plan_id.toString());
-
-  if (companyData.logo) {
-    formData.append("logo", companyData.logo);
-  }
-
-  try {
-    await commerceClient.post(`${API_BASE_URL}/branches`, formData);
-  } catch (error: any) {
-    handleApiError(error, "Error al crear la empresa.");
-  }
-};
-
-
 
 /**
- * Actualizar detalles de una empresa
+ * Actualizar detalles de una empresa usando el ID encriptado
+ * Utilizando el endpoint POST /companies/update/{encryptedId}
  */
 export const updateCompany = async (
-  id: number,
+  encryptedId: string,
   companyData: {
     tipo_documento: string;
     numero_documento: string;
@@ -104,36 +54,32 @@ export const updateCompany = async (
     nombre_comercial: string;
     numeros_contacto: string;
     activo: number;
-    user_role_commerce: number;
     logo: File | null;
-    membership_id: number;
     discount_plan_id: number;
   }
 ): Promise<void> => {
-  if (!id) {
-    throw new Error("El ID de la empresa es obligatorio.");
-  }
-
-  const formData = new FormData();
-
-  formData.append("tipo_documento", companyData.tipo_documento);
-  formData.append("numero_documento", companyData.numero_documento);
-  formData.append("razon_social", companyData.razon_social);
-  formData.append("nombre_comercial", companyData.nombre_comercial);
-  formData.append("numeros_contacto", companyData.numeros_contacto || "");
-  formData.append("activo", companyData.activo.toString());
-  formData.append("user_role_commerce", companyData.user_role_commerce.toString());
-  formData.append("membership_id", companyData.membership_id.toString());
-  formData.append("discount_plan_id", companyData.discount_plan_id.toString());
-
-  if (companyData.logo) {
-    formData.append("logo", companyData.logo);
+  if (!encryptedId) {
+    throw new Error("El ID encriptado de la empresa es obligatorio.");
   }
 
   try {
-    await commerceClient.post(`${API_BASE_URL}/company/${id}/update`, formData);
+    const formData = new FormData();
+
+    formData.append("tipo_documento", companyData.tipo_documento);
+    formData.append("numero_documento", companyData.numero_documento);
+    formData.append("razon_social", companyData.razon_social);
+    formData.append("nombre_comercial", companyData.nombre_comercial);
+    formData.append("numeros_contacto", companyData.numeros_contacto || "");
+    formData.append("activo", companyData.activo.toString());
+    formData.append("discount_plan_id", companyData.discount_plan_id.toString());
+
+    if (companyData.logo) {
+      formData.append("logo", companyData.logo);
+    }
+
+    // Usando el endpoint con ID encriptado
+    await commerceClient.post(`${API_BASE_URL}/companies/update/${encryptedId}`, formData);
   } catch (error: any) {
     handleApiError(error, "Error al actualizar la empresa.");
   }
 };
-

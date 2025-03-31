@@ -82,7 +82,7 @@ export interface StudyAnswer {
   
   // Modelo para crear o actualizar un estudio
   export interface StudyRequest {
-    branch_id: number;
+    branch_id: string;
     titulo: string;
     descripcion: string;
     type: number;

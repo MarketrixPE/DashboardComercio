@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-
 import { Icon } from "@iconify/react";
 import Swal from "sweetalert2";
 import TablaItem, {
@@ -10,20 +9,23 @@ import LocationPicker from "../../../../shared/components/Organisms/LocationPick
 import Uploader from "../../../../shared/components/Atoms/Uploader";
 import { LoadingDots } from "../../../../shared/components/Atoms/LoadingDots/LoadingDots";
 import iconEstuMercado from "../../../../assets/svg/iconEstudiosMercados.svg";
+import iconPromotions from "../../../../assets/svg/iconPromocionesSmart.svg";
 
 import {
   createBranch,
-  deleteBranch,
   getBranchById,
   getBranchesByCompanyId,
   getCategories,
   getSubcategoriesByCategoryId,
   updateBranch,
+  checkBranchLimit,
 } from "../../../../core/services/Operador/Branch/BranchService";
 import ProductsCommerce from "./GestionProductos/ProductsCommerce";
 import SurveysCommerce from "./GestionEncuestas/SurveysCommerce";
 import { branchValidations } from "./BranchValidations";
 import StudiesCommerce from "./GestionEstudiosMercado/StudiesCommerce";
+import { HelperService } from "../../../../core/services/HelperService";
+import PromotionsCommerce from "./GestionPromociones/PromotionsCommerce";
 
 interface BranchProps {
   selectedCompanyId: string | null;
@@ -62,6 +64,7 @@ export function BranchCommerce({
   const [isProductView, setIsProductView] = useState(false);
   const [isSurveysView, setIsSurveysView] = useState(false);
   const [isStudiesView, setIsStudiesView] = useState(false);
+  const [isPromotionsView, setIsPromotionsView] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [logo, setLogo] = useState<File | null>(null);
   const [likes] = useState("1");
@@ -78,6 +81,8 @@ export function BranchCommerce({
   const [selectedSubcategory, setSelectedSubcategory] = useState<number | null>(
     null
   );
+  const [canCreateBranch, setCanCreateBranch] = useState(true);
+  const [isNewImageSelected, setIsNewImageSelected] = useState(false);
   {
     /*-------------- INICIO DATA SELECT ----------------- */
   }
@@ -113,15 +118,35 @@ export function BranchCommerce({
     fetchSubcategories();
   }, [selectedCategory]);
 
+  // Check branch creation limits
+  useEffect(() => {
+    const checkBranchCreationLimit = async () => {
+      try {
+        const limitData = await checkBranchLimit();
+        setCanCreateBranch(limitData.can_create || true); // Default to true if property doesn't exist
+      } catch (error) {
+        console.error("Error al verificar límite de sucursales:", error);
+        // Default to true to not block functionality if check fails
+        setCanCreateBranch(true);
+      }
+    };
+
+    if (selectedCompanyId) {
+      checkBranchCreationLimit();
+    }
+  }, [selectedCompanyId]);
+
   {
     /*-------------- FIN DATA SELECT ----------------- */
   }
 
+  const encryptedCompanyId = HelperService.getCompanyId() || "";
+
   const fetchBranches = async () => {
     setIsLoading(true);
     try {
-      const branches = await getBranchesByCompanyId(selectedCompanyId || "");
-
+      const branches = await getBranchesByCompanyId(encryptedCompanyId);
+      console.log(branches, "branches");
       if (branches.length === 0) {
         setData([]);
 
@@ -137,7 +162,8 @@ export function BranchCommerce({
       }
 
       const formattedData: RowData[] = branches.map((branch: any) => ({
-        id: branch.id,
+        id: branch.uuid,
+        uuid: branch.uuid,
         item: branch.descripcion,
         address: branch.direccion,
         contact: branch.numeros_contacto,
@@ -149,6 +175,7 @@ export function BranchCommerce({
         latitud: branch.latitud,
         longitud: branch.longitud,
       }));
+
       setData(formattedData);
       setIsInitialLoad(false);
     } catch (error: any) {
@@ -217,129 +244,144 @@ export function BranchCommerce({
   };
 
   const saveOrUpdateBranch = async () => {
+    // Check branch limit if creating a new branch
+    if (!isBranchEditing && !canCreateBranch) {
+      Swal.fire({
+        icon: "warning",
+        title: "Límite de sucursales alcanzado",
+        text: "Has alcanzado el límite de sucursales para tu plan actual. Actualiza tu membresía para crear más sucursales.",
+        confirmButtonText: "Entendido",
+      });
+      return;
+    }
+
     if (!validateBranchForm()) return;
     setIsLoading(true);
     try {
       const formData = new FormData();
 
-      // Explicitly convert status to number and log
-      const activeStatus = branchStatus === "Activo" ? 1 : 0;
-      console.log("Attempting to set status:", {
-        branchStatus,
-        activeStatus,
-        selectedBranchId,
-      });
-
+      // Campos básicos
       formData.append("descripcion", branchDescription);
       formData.append("direccion", branchAddress);
-
-      console.log(
-        "Estado a enviar:",
-        branchStatus,
-        "Valor de activo:",
-        branchStatus === "Activo" ? "1" : "0"
-      );
-      formData.append("activo", branchStatus === "Activo" ? "1" : "0");
       formData.append("numeros_contacto", branchContact);
       formData.append("horarios", branchSchedule);
       formData.append("latitud", latitud);
       formData.append("longitud", longitud);
-      formData.append("departamento", departamento);
-      formData.append("provincia", provincia);
-      formData.append("distrito", distrito);
-      formData.append("company_id", selectedCompanyId || "");
-      formData.append("likes", likes);
-      formData.append("rating", rating);
 
-      if (!isBranchEditing && logo) {
-        formData.append("imagen", logo);
-      }
+      // Campos adicionales
+      if (departamento) formData.append("departamento", departamento);
+      if (provincia) formData.append("provincia", provincia);
+      if (distrito) formData.append("distrito", distrito);
 
+      // Categoría y subcategoría
       if (selectedCategory)
-        formData.append("categories[]", selectedCategory.toString());
+        formData.append("category_id", selectedCategory.toString());
       if (selectedSubcategory)
-        formData.append("subcategories[]", selectedSubcategory.toString());
+        formData.append("subcategory_id", selectedSubcategory.toString());
+
+      if (!isBranchEditing) {
+        // CREACIÓN: requiere todos los campos específicos de creación
+        formData.append("company_id", encryptedCompanyId);
+        formData.append("activo", branchStatus === "Activo" ? "1" : "0");
+        if (typeof likes !== "undefined")
+          formData.append("likes", likes.toString());
+        if (typeof rating !== "undefined")
+          formData.append("rating", rating.toString());
+
+        // Para creación, la imagen es obligatoria
+        if (logo && logo instanceof File) {
+          formData.append("imagen", logo);
+        } else {
+          throw new Error("Debes seleccionar una imagen para la sucursal");
+        }
+      } else {
+        if (isNewImageSelected && logo instanceof File) {
+          formData.append("imagen", logo);
+        }
+      }
 
       try {
         if (isBranchEditing && selectedBranchId) {
           // Actualización
-          const updateResponse = await updateBranch(selectedBranchId, formData);
+          formData.append("branch_id", selectedBranchId);
 
+          // Log para depuración
+          console.log("Enviando datos para actualización:");
+          for (let [key, value] of formData.entries()) {
+            console.log(
+              `${key}: ${
+                value instanceof File ? "Archivo: " + value.name : value
+              }`
+            );
+          }
+
+          const updateResponse = await updateBranch(selectedBranchId, formData);
           console.log("Update Response:", updateResponse);
 
-          Swal.fire("¡Actualizado!", "La sucursal fue actualizada.", "success");
+          if (updateResponse.status === "success" || updateResponse.success) {
+            Swal.fire({
+              icon: "success",
+              title: "¡Actualizado!",
+              text:
+                updateResponse.message ||
+                "La sucursal fue actualizada correctamente.",
+              confirmButtonText: "Aceptar",
+            });
+          } else {
+            throw new Error(
+              updateResponse.message || "Error al actualizar la sucursal"
+            );
+          }
         } else {
           // Creación
           const createResponse = await createBranch(formData);
-
-          console.log("Create Response:", createResponse);
-
-          Swal.fire("¡Creado!", "La sucursal fue creada.", "success");
+          if (createResponse.success || createResponse.status === "success") {
+            Swal.fire({
+              icon: "success", // Cambiado de "error" a "success"
+              title: "¡Creado!", // Título corregido
+              text:
+                createResponse.message ||
+                "La sucursal fue creada correctamente.",
+              confirmButtonText: "Aceptar",
+            });
+          } else {
+            throw new Error(
+              createResponse.message || "Error al crear la sucursal"
+            );
+          }
         }
 
         await fetchBranches();
-
         setShowBranchForm(false);
-      } catch (updateCreateError) {
+      } catch (updateCreateError: any) {
         console.error("Update/Create Error:", updateCreateError);
-
         Swal.fire({
           icon: "error",
           title: "Error",
-          text: "Hubo un problema al guardar la sucursal.",
+          text:
+            updateCreateError.message ||
+            "Hubo un problema al guardar la sucursal.",
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("General Error:", error);
-
       Swal.fire({
         icon: "error",
         title: "Error",
-        text: "Hubo un problema al guardar la sucursal.",
+        text: error.message || "Hubo un problema al guardar la sucursal.",
       });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const onDelete = async (row: RowData) => {
-    Swal.fire({
-      title: "¿Estás seguro?",
-      text: `Se eliminará la sucursal "${row.item}". Esta acción no se puede deshacer.`,
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#d33",
-      cancelButtonColor: "#3085d6",
-      confirmButtonText: "Sí, eliminar",
-      cancelButtonText: "Cancelar",
-    }).then(async (result) => {
-      if (result.isConfirmed) {
-        try {
-          await deleteBranch(row.id);
-          setData((prevData) =>
-            prevData.filter((branch) => branch.id !== row.id)
-          );
-          Swal.fire(
-            "¡Eliminado!",
-            "La sucursal ha sido eliminada correctamente.",
-            "success"
-          );
-        } catch (error) {
-          Swal.fire(
-            "Error",
-            "Hubo un problema al eliminar la sucursal.",
-            "error"
-          );
-          console.error("Error al eliminar la sucursal:", error);
-        }
-      }
-    });
-  };
-
   const onEdit = async (row: RowData) => {
     try {
+      console.log("ID de la sucursal a editar:", row.id);
       const branchData = await getBranchById(row.id);
+      console.log("Datos de la sucursal obtenidos:", branchData);
 
+      console.log(branchData, "branchData");
       if (!branchData) {
         Swal.fire("Error", "No se encontró la sucursal.", "error");
         return;
@@ -349,19 +391,34 @@ export function BranchCommerce({
       setBranchAddress(branchData.direccion || "");
       setBranchContact(branchData.numeros_contacto || "");
       setBranchStatus(branchData.activo === 1 ? "Activo" : "Inactivo");
-      setSelectedBranchId(branchData.id);
+      setSelectedBranchId(branchData.uuid);
       setBranchSchedule(branchData.horarios || "");
       setLatitud(branchData.latitud || "-12.046309176843495");
       setLongitud(branchData.longitud || "-77.04274243266966");
+      // Al editar, conservamos la URL de la imagen pero no es un archivo nuevo
       setLogo(branchData.imagen || null);
+      setIsNewImageSelected(false); // Importante: resetear este estado
 
       setDistrito(branchData.distrito || "");
       await delay(100);
 
-      setSelectedCategory(branchData.categories?.[0]?.id || null);
+      // Adjusted for new API structure - directly use category_id and subcategory_id if available
+      if (branchData.category_id) {
+        setSelectedCategory(branchData.category_id);
+      } else if (branchData.categories && branchData.categories.length > 0) {
+        setSelectedCategory(branchData.categories[0]?.id || null);
+      }
+
       await delay(100);
 
-      setSelectedSubcategory(branchData.subcategories?.[0]?.id || null);
+      if (branchData.subcategory_id) {
+        setSelectedSubcategory(branchData.subcategory_id);
+      } else if (
+        branchData.subcategories &&
+        branchData.subcategories.length > 0
+      ) {
+        setSelectedSubcategory(branchData.subcategories[0]?.id || null);
+      }
 
       setShowBranchForm(true);
       setIsBranchEditing(true);
@@ -379,17 +436,17 @@ export function BranchCommerce({
     setBranchDescription("");
     setBranchAddress("");
     setBranchStatus("Activo");
-    setBranchContact("");
+    setBranchContact("+51");
     setBranchSchedule("");
     setSelectedBranchId(null);
     setSelectedCategory(null);
     setSelectedSubcategory(null);
     setIsBranchEditing(false);
     setLogo(null);
+    setIsNewImageSelected(false);
     setDepartamento("");
     setProvincia("");
     setDistrito("");
-
     setLatitud("");
     setLongitud("");
   };
@@ -408,116 +465,41 @@ export function BranchCommerce({
     setSelectedBranchAddress(row.address);
     setIsProductView(true);
   };
+
   const onSur = (row: RowData) => {
     setSelectedBranchId(row.id);
     setSelectedBranchName(row.item);
     setIsSurveysView(true);
   };
+
   const onStud = (row: RowData) => {
     setSelectedBranchId(row.id);
     setSelectedBranchName(row.item);
     setIsStudiesView(true);
   };
+
+  const onPro = (row: RowData) => {
+    setSelectedBranchId(row.id);
+    setSelectedBranchName(row.item);
+    setSelectedBranchAddress(row.address);
+    // Añadir estas dos líneas
+    setLatitud(row.latitud || "");
+    setLongitud(row.longitud || "");
+    setIsPromotionsView(true);
+    
+    // Opcional: agregar un log para verificar
+    console.log("Coordenadas seleccionadas:", {
+      latitud: row.latitud,
+      longitud: row.longitud
+    });
+  };
   const handleBackToTrade = () => {
     setIsProductView(false);
     setIsSurveysView(false);
     setIsStudiesView(false);
+    setIsPromotionsView(false);
     fetchBranches();
   };
-
-  const columns: Column[] = [
-    {
-      Header: "Acciones",
-      Cell: (row: RowData) => (
-        <div className="flex space-x-2">
-          <button
-            title="Encuestas"
-            className="relative pl-1.5 bg-[#81C784] text-slate-50 flex items-center rounded-lg group overflow-hidden transition-all duration-500 ease-in-out w-[2rem] hover:w-[7rem]"
-            onClick={() => onSur(row)}
-          >
-            <Icon
-              icon="wpf:survey"
-              className="flex-shrink-0"
-              width="20"
-              height="20"
-            />
-            <span className="ml-0 opacity-0 translate-x-[-10px] group-hover:opacity-100 group-hover:translate-x-0 group-hover:ml-2 transition-all duration-500 ease-in-out delay-100">
-              Encuestas
-            </span>
-          </button>
-
-          <button
-            title="Encuestas"
-            className="relative pl-1.5 bg-[#9575CD] text-slate-50 flex items-center rounded-lg group overflow-hidden transition-all duration-500 ease-in-out w-[2rem] hover:w-[9rem]"
-            onClick={() => onStud(row)}
-          >
-            <img
-              src={iconEstuMercado}
-              alt="Estudios de Mercado"
-              className="flex-shrink-0 w-5 h-5"
-            />
-            <span className="ml-0 opacity-0 translate-x-[-10px] group-hover:opacity-100 group-hover:translate-x-0 group-hover:ml-2 transition-all duration-500 ease-in-out delay-100 whitespace-nowrap">
-              E. de mercado
-            </span>
-          </button>
-
-          <button
-            title="Productos"
-            className="relative pl-1.5  bg-[#64B5F6] text-slate-50 flex items-center rounded-lg group overflow-hidden transition-all duration-500 ease-in-out w-[2rem] hover:w-[7rem]"
-            onClick={() => onProd(row)}
-          >
-            <Icon
-              icon="dashicons:products"
-              className="flex-shrink-0"
-              width="20"
-              height="20"
-            />
-            <span className="ml-0 opacity-0 translate-x-[-10px] group-hover:opacity-100 group-hover:translate-x-0 group-hover:ml-2 transition-all duration-500 ease-in-out delay-100">
-              Productos
-            </span>
-          </button>
-
-          <button
-            className="relative p-2 bg-blue-500 text-slate-50 flex items-center rounded-lg group overflow-hidden transition-all duration-500 ease-in-out w-[2rem] hover:w-[5rem]"
-            onClick={() => onEdit(row)}
-          >
-            <i className="far fa-edit"></i>
-            <span className="ml-0 opacity-0 translate-x-[-10px] group-hover:opacity-100 group-hover:translate-x-0 group-hover:ml-2 transition-all duration-500 ease-in-out delay-100">
-              Editar
-            </span>
-          </button>
-
-          <button
-            className="relative p-2 bg-red-500 text-slate-50 flex items-center rounded-lg group overflow-hidden transition-all duration-500 ease-in-out w-[2rem] hover:w-[6rem]"
-            onClick={() => onDelete(row)}
-          >
-            <i className="far fa-trash-alt"></i>
-            <span className="ml-0 opacity-0 translate-x-[-10px] group-hover:opacity-100 group-hover:translate-x-0 group-hover:ml-2 transition-all duration-500 ease-in-out delay-100">
-              Eliminar
-            </span>
-          </button>
-        </div>
-      ),
-    },
-    { Header: "Descripción", accessor: "item" as keyof RowData },
-    { Header: "Dirección", accessor: "address" as keyof RowData },
-    { Header: "Contacto", accessor: "contact" as keyof RowData },
-    {
-      Header: "Estado",
-      accessor: "status" as keyof RowData,
-      Cell: (row: RowData) => (
-        <span
-          className={
-            row.status === "Activo"
-              ? "text-white bg-green-500 px-3 py-1 rounded-md"
-              : "text-white bg-red-500 px-3 py-1 rounded-md"
-          }
-        >
-          {row.status}
-        </span>
-      ),
-    },
-  ];
 
   const handleLocationSelect = async (lat: string, lng: string) => {
     setBranchCoordinates({ lat, long: lng });
@@ -546,6 +528,17 @@ export function BranchCommerce({
   };
 
   const onButtonClick = () => {
+    // Check if user can create more branches before showing the form
+    if (!canCreateBranch) {
+      Swal.fire({
+        icon: "warning",
+        title: "Límite de sucursales alcanzado",
+        text: "Has alcanzado el límite de sucursales para tu plan actual. Actualiza tu membresía para crear más sucursales.",
+        confirmButtonText: "Entendido",
+      });
+      return;
+    }
+
     initializeForm();
     setShowBranchForm(true);
   };
@@ -558,6 +551,105 @@ export function BranchCommerce({
       setBranchContact(input);
     }
   };
+
+  const columns: Column[] = [
+    {
+      Header: "Acciones",
+      Cell: (row: RowData) => (
+        <div className="flex space-x-2">
+          <button
+            title="Encuestas"
+            className="relative pl-1.5 bg-[#81C784] text-slate-50 flex items-center rounded-lg group overflow-hidden transition-all duration-500 ease-in-out w-[2rem] hover:w-[7rem]"
+            onClick={() => onSur(row)}
+          >
+            <Icon
+              icon="wpf:survey"
+              className="flex-shrink-0"
+              width="20"
+              height="20"
+            />
+            <span className="ml-0 opacity-0 translate-x-[-10px] group-hover:opacity-100 group-hover:translate-x-0 group-hover:ml-2 transition-all duration-500 ease-in-out delay-100">
+              Encuestas
+            </span>
+          </button>
+
+          <button
+            title="Estudios de Mercado"
+            className="relative pl-1.5 bg-[#9575CD] text-slate-50 flex items-center rounded-lg group overflow-hidden transition-all duration-500 ease-in-out w-[2rem] hover:w-[9rem]"
+            onClick={() => onStud(row)}
+          >
+            <img
+              src={iconEstuMercado}
+              alt="Estudios de Mercado"
+              className="flex-shrink-0 w-5 h-5"
+            />
+            <span className="ml-0 opacity-0 translate-x-[-10px] group-hover:opacity-100 group-hover:translate-x-0 group-hover:ml-2 transition-all duration-500 ease-in-out delay-100 whitespace-nowrap">
+              E. de mercado
+            </span>
+          </button>
+
+          <button
+            title="Promociones Smart"
+            className="relative pl-1.5 bg-[#b375cd] text-slate-50 flex items-center rounded-lg group overflow-hidden transition-all duration-500 ease-in-out w-[2rem] hover:w-[10rem]"
+            onClick={() => onPro(row)}
+          >
+            <img
+              src={iconPromotions}
+              alt="Estudios de Mercado"
+              className="flex-shrink-0 w-5 h-5"
+            />
+            <span className="ml-0 opacity-0 translate-x-[-10px] group-hover:opacity-100 group-hover:translate-x-0 group-hover:ml-2 transition-all duration-500 ease-in-out delay-100 whitespace-nowrap">
+              Promociones Smart
+            </span>
+          </button>
+
+          <button
+            title="Productos"
+            className="relative pl-1.5 bg-[#64B5F6] text-slate-50 flex items-center rounded-lg group overflow-hidden transition-all duration-500 ease-in-out w-[2rem] hover:w-[7rem]"
+            onClick={() => onProd(row)}
+          >
+            <Icon
+              icon="dashicons:products"
+              className="flex-shrink-0"
+              width="20"
+              height="20"
+            />
+            <span className="ml-0 opacity-0 translate-x-[-10px] group-hover:opacity-100 group-hover:translate-x-0 group-hover:ml-2 transition-all duration-500 ease-in-out delay-100">
+              Productos
+            </span>
+          </button>
+
+          <button
+            className="relative p-2 bg-blue-500 text-slate-50 flex items-center rounded-lg group overflow-hidden transition-all duration-500 ease-in-out w-[2rem] hover:w-[5rem]"
+            onClick={() => onEdit(row)}
+          >
+            <i className="far fa-edit"></i>
+            <span className="ml-0 opacity-0 translate-x-[-10px] group-hover:opacity-100 group-hover:translate-x-0 group-hover:ml-2 transition-all duration-500 ease-in-out delay-100">
+              Editar
+            </span>
+          </button>
+        </div>
+      ),
+    },
+    { Header: "Descripción", accessor: "item" as keyof RowData },
+    { Header: "Dirección", accessor: "address" as keyof RowData },
+    { Header: "Contacto", accessor: "contact" as keyof RowData },
+    {
+      Header: "Estado",
+      accessor: "status" as keyof RowData,
+      Cell: (row: RowData) => (
+        <span
+          className={
+            row.status === "Activo"
+              ? "text-white bg-green-500 px-3 py-1 rounded-md"
+              : "text-white bg-red-500 px-3 py-1 rounded-md"
+          }
+        >
+          {row.status}
+        </span>
+      ),
+    },
+  ];
 
   return (
     <>
@@ -710,7 +802,10 @@ export function BranchCommerce({
                     Logo de la Empresa
                   </label>
                   <Uploader
-                    onFileSelect={(file) => setLogo(file)}
+                    onFileSelect={(file) => {
+                      setLogo(file);
+                      setIsNewImageSelected(true);
+                    }}
                     accept="image/jpeg, image/jpg, image/png"
                     maxSize={10 * 1024 * 1024}
                     label="Sube tu logo aquí"
@@ -752,7 +847,8 @@ export function BranchCommerce({
       {!showBranchForm &&
         !isProductView &&
         !isSurveysView &&
-        !isStudiesView && (
+        !isStudiesView &&
+        !isPromotionsView && (
           <div className="container mx-auto my-8">
             <TablaItem
               data={data}
@@ -760,7 +856,6 @@ export function BranchCommerce({
               title={`Sucursales de ${selectedCompanyName}`}
               buttonLabel="Agregar Sucursal"
               onButtonClick={onButtonClick}
-              newButtonLabel="Importar"
               showBackButton={true}
               onBackClick={onBackClick}
             />
@@ -791,6 +886,22 @@ export function BranchCommerce({
           branchAddress={selectedBranchAddress}
           onBackClick={handleBackToTrade}
         />
+      )}
+      {isPromotionsView && (
+        <>
+          {console.log("Coordenadas enviadas a PromotionsCommerce:", {
+            latitud,
+            longitud,
+          })}
+          <PromotionsCommerce
+            selectedBranchName={selectedBranchName}
+            branchId={selectedBranchId}
+            branchAddress={selectedBranchAddress}
+            onBackClick={handleBackToTrade}
+            latitud={latitud}
+            longitud={longitud}
+          />
+        </>
       )}
     </>
   );

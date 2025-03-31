@@ -1,97 +1,53 @@
 import { AxiosError } from "axios";
 import { commerceClient } from "../../../Interceptors/apiClient";
 
-const API_URL = `${import.meta.env.VITE_API_BASE_URL_COMMERCE}/metrics`;
+// Ajustar la base URL para que coincida con las rutas del backend
+const API_BASE_URL = `${import.meta.env.VITE_API_BASE_URL_COMMERCE}`;
 
 type MetricsParams = {
-  userId: number;
+  uuid: number | string | null;
   timeFrame?: string;
   startDate?: string;
   endDate?: string;
 };
 
-export const getPointsMetrics = async (params: MetricsParams) => {
+// Función genérica para hacer peticiones
+const fetchMetrics = async (endpoint: string, params: MetricsParams, errorMessage: string) => {
   try {
-    const response = await commerceClient.post(`${API_URL}/points`, params);
+    const response = await commerceClient.post(`${API_BASE_URL}/${endpoint}`, params);
     return response.data.data || {};
   } catch (error: any) {
-    let errorMessage = "Error al obtener métricas de puntos.";
+    let message = errorMessage;
     if (error instanceof AxiosError && error.response) {
-      errorMessage = error.response.data?.message || errorMessage;
+      message = error.response.data?.message || message;
+      // Incluir más detalles del error en los logs
+      console.error(`Error en ${endpoint}:`, {
+        message,
+        status: error.response?.status,
+        data: error.response?.data,
+      });
+    } else {
+      console.error(message, error);
     }
-    console.error(errorMessage);
-    throw new Error(errorMessage);
+    throw new Error(message);
   }
 };
 
-export const getCouponsMetrics = async (params: MetricsParams) => {
-  try {
-    const response = await commerceClient.post(`${API_URL}/coupons`, params);
-    return response.data.data || {};
-  } catch (error: any) {
-    let errorMessage = "Error al obtener métricas de cupones.";
-    if (error instanceof AxiosError && error.response) {
-      errorMessage = error.response.data?.message || errorMessage;
-    }
-    console.error(errorMessage);
-    throw new Error(errorMessage);
-  }
-};
+// Funciones específicas que usan la función genérica
+export const getPointsMetrics = (params: MetricsParams) =>
+  fetchMetrics("metrics/points", params, "Error al obtener métricas de puntos.");
 
-export const getPromotionsMetrics = async (params: MetricsParams) => {
-  try {
-    const response = await commerceClient.post(`${API_URL}/promotions`, params);
-    return response.data.data || {};
-  } catch (error: any) {
-    let errorMessage = "Error al obtener métricas de promociones.";
-    if (error instanceof AxiosError && error.response) {
-      errorMessage = error.response.data?.message || errorMessage;
-    }
-    console.error(errorMessage);
-    throw new Error(errorMessage);
-  }
-};
+export const getCouponsMetrics = (params: MetricsParams) =>
+  fetchMetrics("metrics/coupons", params, "Error al obtener métricas de cupones.");
 
-export const getSurveysMetrics = async (params: MetricsParams) => {
-  try {
-    const response = await commerceClient.post(`${API_URL}/surveys`, params);
-    return response.data.data || {};
-  } catch (error: any) {
-    let errorMessage = "Error al obtener métricas de encuestas.";
-    if (error instanceof AxiosError && error.response) {
-      errorMessage = error.response.data?.message || errorMessage;
-    }
-    console.error(errorMessage);
-    throw new Error(errorMessage);
-  }
-};
+export const getPromotionsMetrics = (params: MetricsParams) =>
+  fetchMetrics("metrics/promotions", params, "Error al obtener métricas de promociones.");
 
-export const getMarketStudiesMetrics = async (params: MetricsParams) => {
-  try {
-    const response = await commerceClient.post(`${API_URL}/studies`, params);
-    return response.data.data || {};
-  } catch (error: any) {
-    let errorMessage = "Error al obtener métricas de estudios.";
-    if (error instanceof AxiosError && error.response) {
-      errorMessage = error.response.data?.message || errorMessage;
-    }
-    console.error(errorMessage);
-    throw new Error(errorMessage);
-  }
-};
+export const getSurveysMetrics = (params: MetricsParams) =>
+  fetchMetrics("metrics/surveys", params, "Error al obtener métricas de encuestas.");
 
-export const getMetricsTrend = async (params: MetricsParams) => {
-  console.log("Parámetros enviados:", params);
-  try {
-    const response = await commerceClient.post(`${API_URL}/trend`, params);
-    console.log("getMetricsTrend",response.data.data)
-    return response.data.data || {};
-  } catch (error: any) {
-    let errorMessage = "Error al obtener la tendencia de métricas.";
-    if (error instanceof AxiosError && error.response) {
-      errorMessage = error.response.data?.message || errorMessage;
-    }
-    console.error(errorMessage);
-    throw new Error(errorMessage);
-  }
-};
+export const getMarketStudiesMetrics = (params: MetricsParams) =>
+  fetchMetrics("metrics/studies", params, "Error al obtener métricas de estudios.");
+
+export const getMetricsTrend = (params: MetricsParams) =>
+  fetchMetrics("metrics/trend", params, "Error al obtener la tendencia de métricas.");

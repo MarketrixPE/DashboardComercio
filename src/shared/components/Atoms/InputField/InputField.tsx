@@ -9,7 +9,8 @@ export const InputField: FC<InputFieldProps> = ({
   error,
   placeholder,
   required,
-  maxLength
+  maxLength,
+  autocomplete
 }) => {
   return (
     <div className="input-group">
@@ -21,6 +22,7 @@ export const InputField: FC<InputFieldProps> = ({
         placeholder={placeholder}
         required={required}
         maxLength={maxLength}
+        autoComplete={autocomplete} 
         className={`${
           error 
             ? 'border-red-500 focus:ring-red-500 focus:border-red-500' 

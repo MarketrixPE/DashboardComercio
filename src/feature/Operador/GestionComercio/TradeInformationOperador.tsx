@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-
 import Swal from "sweetalert2";
-
 import { Icon } from "@iconify/react/dist/iconify.js";
 import { LoadingDots } from "../../../shared/components/Atoms/LoadingDots/LoadingDots";
 import Uploader from "../../../shared/components/Atoms/Uploader";
@@ -10,9 +8,7 @@ import TablaItem, {
   Column,
 } from "../../../shared/components/Molecules/TablaItem/TablaItem";
 import {
-  createCompany,
-  getCompanyById,
-  getCompanyByUser,
+  getCompanyDetails,
   updateCompany,
 } from "../../../core/services/Operador/TradeService/TradeService";
 import BranchCommerce from "./GestionSucursales/BranchCommerce";
@@ -20,6 +16,7 @@ import { Tooltip } from "react-tooltip";
 import { validateRUC } from "../../../core/services/SunatService";
 import CustomDropdown from "../../../shared/components/Atoms/Dropdown/Dropdown";
 import { tradeOperatorValidations } from "./TradeOperatorValidations";
+import { HelperService } from "../../../core/services/HelperService";
 
 function TradeInformationOperador() {
   const [data, setData] = useState<RowData[]>([]);
@@ -32,14 +29,12 @@ function TradeInformationOperador() {
   const [nombreComercial, setNombreComercial] = useState("");
   const [numerosContacto, setNumeroscontacto] = useState("+51");
   const [selectedCompanyName, setSelectedCompanyName] = useState<string>("");
-  const [] = useState<number | null>(null);
   const [isBranchView, setIsBranchView] = useState(false);
-  const [isMerchantView, ] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [logo, setLogo] = useState<File | null>(null);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [membershipId, setMembershipId] = useState<number | "">(3);
-  const [discountPlanId, setDiscountPlanId] = useState<number | "">("");
+  const [discountPlanId, setDiscountPlanId] = useState<number | "">(1); // Default a 1 (10%)
   const [showButton, setShowButton] = useState(false);
 
   const validateOperatorForm = (): boolean => {
@@ -80,71 +75,6 @@ function TradeInformationOperador() {
     return true;
   };
 
-  const handleSubmit = async () => {
-    if (!validateOperatorForm()) return;
-    setIsLoading(true);
-
-    try {
-      // Validar RUC
-      const rucInfo = await validateRUC(numeroDocumento);
-
-      // Continuar con el flujo normal
-      const commerceUserId = localStorage.getItem("commerce_user_id");
-      if (!commerceUserId) {
-        throw new Error("No se encontró el ID del usuario en el localStorage.");
-      }
-
-      const membershipIdNumber = Number(membershipId);
-      const discountPlanIdNumber = Number(discountPlanId);
-
-      if (isNaN(membershipIdNumber) || isNaN(discountPlanIdNumber)) {
-        throw new Error(
-          "Debe seleccionar una membresía y un plan de descuento válidos."
-        );
-      }
-
-      const payload = {
-        tipo_documento: tipoDocumento,
-        numero_documento: numeroDocumento,
-        razon_social: rucInfo.razonSocial || razonSocial,
-        nombre_comercial: nombreComercial,
-        numeros_contacto: numerosContacto,
-        logo,
-        user_role_commerce: Number(commerceUserId),
-        activo: 1,
-        membership_id: 3,
-        discount_plan_id: discountPlanIdNumber,
-        // membership_id: membershipIdNumber,
-      };
-      if (isEditing && currentCompanyId) {
-        await updateCompany(currentCompanyId, payload);
-        Swal.fire(
-          "Actualización exitosa",
-          "La empresa ha sido actualizada correctamente.",
-          "success"
-        );
-      } else {
-        await createCompany(payload);
-        Swal.fire(
-          "Guardado exitoso",
-          "La empresa ha sido creada correctamente.",
-          "success"
-        );
-      }
-
-      setShowForm(false);
-      fetchData();
-    } catch (error: any) {
-      Swal.fire({
-        icon: "error",
-        title: isEditing ? "Error al actualizar" : "Error al guardar",
-        text: error.message || "Hubo un problema en la operación.",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const validateRUCOnChange = async (ruc: string) => {
     try {
       const rucInfo = await validateRUC(ruc);
@@ -177,21 +107,28 @@ function TradeInformationOperador() {
   };
 
   const hasFetchedCompanies = useRef(false);
+  const encryptedCompanyId = HelperService.getCompanyId();
 
   const fetchData = async () => {
     setIsLoading(true);
 
     try {
-      const userId = localStorage.getItem("commerce_user_id");
-      if (!userId) {
-        throw new Error("No se encontró el user_id en el localStorage.");
+      if (!encryptedCompanyId) {
+        setData([]);
+        setShowButton(true);
+        Swal.fire({
+          icon: "info",
+          title: "No hay datos",
+          text: "No se encontró información de la compañía.",
+        });
+        return;
       }
 
-      // Llamada al servicio para obtener los datos de la compañía por user_id
-      const company = await getCompanyByUser(Number(userId));
+      // Obtener los detalles de la compañía usando el ID encriptado
+      const company = await getCompanyDetails(encryptedCompanyId);
       if (!company) {
         setData([]);
-        setShowButton(true); // Mostrar el botón si no hay datos
+        setShowButton(true);
         Swal.fire({
           icon: "info",
           title: "No hay datos",
@@ -204,23 +141,20 @@ function TradeInformationOperador() {
         {
           id: company.id,
           nombre_comercial: company.nombre_comercial,
-          created_at: company.fecha || null,
           status: company.activo === 1 ? "Activo" : "Inactivo",
           activo: company.activo,
           razon_social: company.razon_social,
-          departamento: company.departamento,
-          provincia: company.provincia,
-          distrito: company.distrito,
           numero_documento: company.numero_documento,
           tipo_documento: company.tipo_documento,
           numeros_contacto: company.numeros_contacto,
           logo: company.logo,
+          encrypted_id: encryptedCompanyId, // Guardar el ID encriptado para usarlo después
         },
       ];
       setData(formattedData);
       setShowButton(false); // Ocultar el botón si hay datos
     } catch (error: any) {
-      console.error("Error al cargar los datos:", error.message);
+      console.error("Error al cargar los datos:", error);
       setShowButton(true); // Mostrar el botón en caso de error
     } finally {
       setIsLoading(false);
@@ -233,10 +167,14 @@ function TradeInformationOperador() {
     setShowForm(true);
     setIsEditing(true);
     setIsLoading(true);
-
+    console.log("first", encryptedCompanyId);
     try {
-      const company = await getCompanyById(row.id);
-      console.log("first", company);
+      if (!encryptedCompanyId) {
+        throw new Error("No se encontró el ID encriptado de la compañía.");
+      }
+
+      // Usando el endpoint para obtener detalles usando ID encriptado
+      const company = await getCompanyDetails(encryptedCompanyId);
 
       // Configurar los datos existentes de la empresa
       setTipoDocumento(company.tipo_documento);
@@ -245,14 +183,78 @@ function TradeInformationOperador() {
       setNombreComercial(company.nombre_comercial);
       setLogoUrl(company.logo);
       setNumeroscontacto(company.numeros_contacto);
+
       // Configurar los nuevos campos
-      setMembershipId(company.membership_id || "");
-      setDiscountPlanId(company.discount_plan_id || "");
+      setMembershipId(company.membership_id || 3); // Default a 3 (Infinity)
+      setDiscountPlanId(company.discount_plan_id || 1); // Default a 1 (10%)
     } catch (error: any) {
       Swal.fire({
         icon: "error",
         title: "Error al cargar datos",
         text: error.message || "No se pudieron cargar los datos de la empresa.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!validateOperatorForm()) return;
+    setIsLoading(true);
+
+    try {
+      // Validar RUC
+      const rucInfo = await validateRUC(numeroDocumento);
+      const membershipIdNumber = Number(membershipId);
+      const discountPlanIdNumber = Number(discountPlanId);
+
+      if (isNaN(membershipIdNumber) || isNaN(discountPlanIdNumber)) {
+        throw new Error(
+          "Debe seleccionar una membresía y un plan de descuento válidos."
+        );
+      }
+
+      const payload = {
+        tipo_documento: tipoDocumento,
+        numero_documento: numeroDocumento,
+        razon_social: rucInfo.razonSocial || razonSocial,
+        nombre_comercial: nombreComercial,
+        numeros_contacto: numerosContacto,
+        logo,
+        activo: 1,
+        discount_plan_id: discountPlanIdNumber,
+      };
+
+      if (isEditing) {
+        // Obtener el ID encriptado (del objeto row o del localStorage)
+        const encryptedId = localStorage.getItem("commerce_company_id");
+        if (!encryptedId) {
+          throw new Error("No se encontró el ID encriptado de la compañía.");
+        }
+
+        await updateCompany(encryptedId, payload);
+        Swal.fire(
+          "Actualización exitosa",
+          "La empresa ha sido actualizada correctamente.",
+          "success"
+        );
+
+        setShowForm(false);
+        fetchData();
+      } else {
+        // Como no tenemos un método de creación con los 3 endpoints,
+        // podemos mostrar un mensaje de que esta funcionalidad no está disponible
+        Swal.fire({
+          icon: "warning",
+          title: "Funcionalidad no disponible",
+          text: "La creación de nuevas empresas no está disponible actualmente. Por favor, contacte al administrador del sistema.",
+        });
+      }
+    } catch (error: any) {
+      Swal.fire({
+        icon: "error",
+        title: isEditing ? "Error al actualizar" : "Error al guardar",
+        text: error.message || "Hubo un problema en la operación.",
       });
     } finally {
       setIsLoading(false);
@@ -271,16 +273,6 @@ function TradeInformationOperador() {
       Header: "Acciones",
       Cell: (row: RowData) => (
         <div className="flex space-x-2">
-          {/* <button
-            className="relative p-2 bg-green-500 text-slate-50 flex items-center rounded-lg group overflow-hidden transition-all duration-500 ease-in-out w-[2rem] hover:w-[9rem]"
-            onClick={() => onMerchant(row)}
-          >
-            <i className="fas fa-lock" style={{ color: "#ffffff" }} />
-            <span className="ml-0 opacity-0 translate-x-[-10px] group-hover:opacity-100 group-hover:translate-x-0 group-hover:ml-2 transition-all duration-500 ease-in-out delay-100">
-              Credenciales
-            </span>
-          </button> */}
-
           <button
             id="tooltip-branch"
             className="relative pl-1 bg-green-500 text-slate-50 flex items-center rounded-lg group overflow-hidden transition-all duration-500 ease-in-out w-[2rem] hover:w-[8rem]"
@@ -319,11 +311,17 @@ function TradeInformationOperador() {
       Header: "Estado",
       accessor: "activo" as keyof RowData,
       Cell: (row: RowData) => (
-        <span className={row.activo === 1 ? "text-white bg-green-500 px-3 py-1 rounded-md" : "text-white bg-red-500 px-3 py-1 rounded-md"}>
+        <span
+          className={
+            row.activo === 1
+              ? "text-white bg-green-500 px-3 py-1 rounded-md"
+              : "text-white bg-red-500 px-3 py-1 rounded-md"
+          }
+        >
           {row.activo === 1 ? "Activo" : "Inactivo"}
         </span>
       ),
-    }
+    },
   ];
 
   const onBranch = (row: RowData) => {
@@ -348,8 +346,8 @@ function TradeInformationOperador() {
     setNumeroDocumento("");
     setRazonSocial("");
     setNombreComercial("");
-    setDiscountPlanId("");
-    setMembershipId("");
+    setDiscountPlanId(1); // Default a 1 (10%)
+    setMembershipId(3); // Default a 3 (Infinity)
     setLogo(null);
   };
 
@@ -546,7 +544,7 @@ function TradeInformationOperador() {
           </div>
         </div>
       )}
-      {!isBranchView && !showForm && !isMerchantView && (
+      {!isBranchView && !showForm && (
         <div className="container mx-auto my-8">
           <TablaItem
             data={data}
@@ -554,7 +552,6 @@ function TradeInformationOperador() {
             title="Mi Comercio Smart"
             buttonLabel="Agregar Comercio"
             onButtonClick={handleButtonClick}
-            newButtonLabel="Importar"
             onEdit={onEdit}
             showNewButton={false}
             showButton={showButton}
@@ -568,9 +565,6 @@ function TradeInformationOperador() {
           selectedCompanyName={selectedCompanyName}
           onBackClick={handleBackToTrade}
         />
-      )}
-      {isMerchantView && (
-        <div className="fasf"></div>
       )}
     </>
   );

@@ -11,11 +11,12 @@ import SettingsCommerce from "../feature/Operador/MiPerfil/SettingsCommerce";
 import BranchInformation from "../feature/Operador/GestionComercio/GestionTrabajadores/BranchInformation";
 import Terminos from "../feature/PreguntasFrecuentes/Terminos";
 import Privacidad from "../feature/PreguntasFrecuentes/Privacidad";
-import RegisterComercio from "../feature/Operador/RegisterComercio/RegisterComercio";
 import SmartDashboard from "../feature/Operador/EstadisticaComercio/SmartDashboard";
 import PaymentDemoPage from "../feature/Izipay/PaymentDemoPage";
 import VisualizacionMembresias from "../feature/Operador/SuscripcionesSmart/SuscripcionesSmart";
 import CarritoPuntosSmartDemo from "../feature/Operador/CarritoPuntosSmartDemo/CarritoPuntosSmartDemo";
+import NotFound from "../feature/NotFound/NotFound";
+import UserManagement from "../feature/Operador/GestionComercio/GestionTrabajadores/UserManagement";
 
 function App() {
   const [loading, setLoading] = useState<boolean>(true);
@@ -43,15 +44,6 @@ function App() {
             <>
               <PageTitle title="Iniciar Sesión | Panel de Commercio Smart" />
               <SignUp />
-            </>
-          }
-        />
-        <Route
-          path="/register-comercio"
-          element={
-            <>
-              <PageTitle title="Registro de Comercio | Panel de Commercio Smart" />
-              <RegisterComercio />
             </>
           }
         />
@@ -94,6 +86,15 @@ function App() {
               }
             />
             <Route
+              path="/mis-trabajadores"
+              element={
+                <>
+                  <PageTitle title="Mi Comercio | Panel de Comercio Smart" />
+                  <UserManagement />
+                </>
+              }
+            />
+            <Route
               path="/mi-factura"
               element={
                 <>
@@ -112,7 +113,7 @@ function App() {
               }
             />
             <Route
-              path="/mis-trabajadores"
+              path="/mis-trabajasssssdores"
               element={
                 <>
                   <PageTitle title="Mi Comercio | Panel de Comercio Smart" />
@@ -150,6 +151,56 @@ function App() {
             />
           </Route>
         </Route>
+        // NUEVAS RUTAS PARA BRANCH_MANAGER (NIVEL 3)
+        <Route element={<ProtectedRoute allowedRoles={["branch_manager"]} />}>
+          <Route element={<DefaultLayout />}>
+            <Route
+              path="/dashboard-sucursal"
+              element={
+                <>
+                  <PageTitle title="Dashboard | Gerente de Sucursal" />
+                  <SmartDashboard />{" "}
+                </>
+              }
+            />
+            <Route
+              path="/transacciones"
+              element={
+                <>
+                  <PageTitle title="Transacciones | Gerente de Sucursal" />
+                  <div>Historial de Transacciones</div>{" "}
+                </>
+              }
+            />
+            <Route
+              path="/mi-sucursal"
+              element={
+                <>
+                  <PageTitle title="Mi Sucursal | Gerente de Sucursal" />
+                  <TradeInformationOperador />{" "}
+                </>
+              }
+            />
+            <Route
+              path="/perfil-sucursal"
+              element={
+                <>
+                  <PageTitle title="Perfil | Gerente de Sucursal" />
+                  <SettingsCommerce />
+                </>
+              }
+            />
+          </Route>
+        </Route>
+        <Route
+          path="*"
+          element={
+            <>
+              <PageTitle title="Página no encontrada | Panel de Comercio Smart" />
+              <NotFound />
+            </>
+          }
+        />
       </Routes>
     </LoadScript>
   );

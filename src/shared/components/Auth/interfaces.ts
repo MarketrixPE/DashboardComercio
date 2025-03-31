@@ -8,4 +8,5 @@ export interface InputFieldProps {
   required?: boolean;
   maxLength?: number;
   className?: string;
+  autocomplete?: string;
 }

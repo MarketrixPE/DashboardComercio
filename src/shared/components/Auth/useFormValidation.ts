@@ -1,5 +1,3 @@
-// hooks/useFormValidation.ts
-//HOOK GENERAL PARA VALIDACIONES EN
 import { useState } from "react";
 import {
   validateSmartUserPassword,

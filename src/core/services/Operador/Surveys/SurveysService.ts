@@ -4,7 +4,6 @@ import { Question, Survey } from "../../../models/surveys";
 
 const API_URL = `${import.meta.env.VITE_API_BASE_URL_COMMERCE}/surveys`;
 
-
 export const getSurveys = async (): Promise<Survey[]> => {
   try {
     const response = await commerceClient.get(API_URL);
@@ -24,23 +23,18 @@ export const getSurveys = async (): Promise<Survey[]> => {
 
 export const getSurveyById = async (id: number): Promise<{ data: Survey }> => {
   try {
-    const response = await commerceClient.get(`${API_URL}/show/${id}`);
-    if (response.data.success) {
-      return response.data;
-    }
-    throw new Error("No se encontró la encuesta solicitada.");
+    const response = await commerceClient.post(`${API_URL}/show`, { id });
+    return response.data;
   } catch (error: any) {
     let errorMessage = "Error al obtener la encuesta.";
-    if (error instanceof AxiosError && error.response) {
-      errorMessage = error.response.data?.message || errorMessage;
-    }
+    errorMessage = error.response.data?.message || errorMessage;
     console.error("Error en el servicio de obtener encuesta:", errorMessage);
     throw new Error(errorMessage);
   }
 };
 
 export const getSurveysByBranch = async (
-  branchId: string | number
+  branchId: string
 ): Promise<Survey[]> => {
   try {
     const response = await commerceClient.post(`${API_URL}/branch`, {
@@ -61,7 +55,7 @@ export const getSurveysByBranch = async (
 };
 
 export const createSurvey = async (surveyData: {
-  branch_id: number;
+  branch_id: string;
   questions: Question[];
 }): Promise<void> => {
   try {
@@ -85,7 +79,7 @@ export const createSurvey = async (surveyData: {
 export const updateSurvey = async (
   id: number,
   surveyData: {
-    branch_id: number;
+    branch_id: string;
     questions: Question[];
   }
 ): Promise<void> => {

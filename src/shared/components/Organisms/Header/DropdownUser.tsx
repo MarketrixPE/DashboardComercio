@@ -11,32 +11,58 @@ const DropdownUser = () => {
     lastName: string;
     role: string;
     avatar: string;
+    userType: string;
   }>({
     name: "Usuario",
     lastName: "",
     role: "0",
     avatar: UserPlaceholder,
+    userType: "commerce",
   });
 
   useEffect(() => {
-    const role = localStorage.getItem("commerce_role") || "0";
-    const name = localStorage.getItem("commerce_name") || "Usuario";
-    const lastName = localStorage.getItem("commerce_last_name") || "";
-    const avatar = localStorage.getItem("commerce_avatar") || UserPlaceholder;
+    // Verificar primero el rol del usuario
+    const userRole = localStorage.getItem("user_role") || "0";
 
-    setUserData({ name, lastName, role, avatar });
+    // Determinar el tipo de usuario basado en el rol
+    const userType = userRole === "3" ? "branch_manager" : "commerce";
+
+    // Obtener los datos correspondientes según el tipo de usuario
+    const name = localStorage.getItem(`${userType}_name`) || "Usuario";
+    const lastName = localStorage.getItem(`${userType}_last_name`) || "";
+    const avatar =
+      localStorage.getItem(`${userType}_avatar`) || UserPlaceholder;
+
+    setUserData({ name, lastName, role: userRole, avatar, userType });
   }, []);
 
   const handleLogout = async () => {
     try {
-      await logout("commerce");
+      // Usar el tipo de usuario correcto para el logout
+      await logout(userData.userType);
     } catch (error) {
       console.error("Error al cerrar sesión:", error);
     }
   };
 
-  // Determina el texto del rol basado en el valor de `role`
-  const roleText = userData.role === "2" ? "Comercio" : "Usuario";
+  // Determinar el texto del rol basado en el valor de `role`
+  const getRoleText = () => {
+    switch (userData.role) {
+      case "2":
+        return "Comercio";
+      case "3":
+        return "Gerente de Sucursal";
+      default:
+        return "Usuario";
+    }
+  };
+
+  // Obtener el perfil URL según el tipo de usuario
+  const getProfileUrl = () => {
+    return userData.userType === "branch_manager"
+      ? "/perfil-sucursal"
+      : "/settings-commerce";
+  };
 
   return (
     <ClickOutside onClick={() => setDropdownOpen(false)} className="relative">
@@ -46,21 +72,18 @@ const DropdownUser = () => {
         to="#"
       >
         <span className="hidden text-right lg:block">
-          {/* Mostrar name y lastName */}
           <span className="block text-sm font-medium text-black dark:text-white">
             {userData.name} {userData.lastName}
           </span>
-          {/* Mostrar el texto del rol */}
-          <span className="block text-xs">{roleText}</span>
+          <span className="block text-xs">{getRoleText()}</span>
         </span>
 
-        {/* Imagen del avatar del usuario */}
         <span className="h-12 w-12 rounded-full">
           <img
             src={userData.avatar}
             alt="User"
             className="object-cover rounded-full h-full w-full"
-          />{" "}
+          />
         </span>
 
         <svg
@@ -85,10 +108,10 @@ const DropdownUser = () => {
         <div
           className={`absolute right-0 mt-4 flex w-62.5 flex-col rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark`}
         >
-          {/* <ul className="flex flex-col gap-5 border-b border-stroke px-6 py-7.5 dark:border-strokedark">
+          <ul className="flex flex-col gap-5 border-b border-stroke px-6 py-7.5 dark:border-strokedark">
             <li>
               <Link
-                to="/settings-commerce"
+                to={getProfileUrl()}
                 className="flex items-center gap-3.5 text-sm font-medium duration-300 ease-in-out hover:text-primary lg:text-base"
               >
                 <svg
@@ -111,7 +134,41 @@ const DropdownUser = () => {
                 Mi perfil
               </Link>
             </li>
-          </ul> */}
+
+            {/* Opciones específicas según rol */}
+            {userData.userType === "branch_manager" && (
+              <li>
+                <Link
+                  to="/transacciones"
+                  className="flex items-center gap-3.5 text-sm font-medium duration-300 ease-in-out hover:text-primary lg:text-base"
+                >
+                  <svg
+                    className="fill-current"
+                    width="22"
+                    height="22"
+                    viewBox="0 0 22 22"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M21 5.25H3C2.59 5.25 2.25 4.91 2.25 4.5C2.25 4.09 2.59 3.75 3 3.75H21C21.41 3.75 21.75 4.09 21.75 4.5C21.75 4.91 21.41 5.25 21 5.25Z"
+                      fill=""
+                    />
+                    <path
+                      d="M10.65 16.5H3C2.59 16.5 2.25 16.16 2.25 15.75C2.25 15.34 2.59 15 3 15H10.65C11.06 15 11.4 15.34 11.4 15.75C11.4 16.16 11.06 16.5 10.65 16.5Z"
+                      fill=""
+                    />
+                    <path
+                      d="M21 10.875H3C2.59 10.875 2.25 10.535 2.25 10.125C2.25 9.715 2.59 9.375 3 9.375H21C21.41 9.375 21.75 9.715 21.75 10.125C21.75 10.535 21.41 10.875 21 10.875Z"
+                      fill=""
+                    />
+                  </svg>
+                  Transacciones
+                </Link>
+              </li>
+            )}
+          </ul>
+
           <button
             className="flex items-center gap-3.5 px-6 py-4 text-sm font-medium duration-300 ease-in-out hover:text-primary lg:text-base"
             onClick={handleLogout}

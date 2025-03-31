@@ -26,6 +26,7 @@ import {
 } from "../../../../../core/models/ubigueo/ubigeo";
 import CascadingLocationDropdown from "../../../../../shared/components/Organisms/CascadingLocationDropdown/CascadingLocationDropdown";
 import Uploader from "../../../../../shared/components/Atoms/Uploader";
+import { studiesValidations } from "./studiesValidations";
 
 interface StudiesProps {
   branchId: string | null;
@@ -50,7 +51,7 @@ function StudiesCommerce({
   const [studyDetails, setStudyDetails] = useState({
     titulo: "",
     descripcion: "",
-    type: 1, // 1=General, 2=Segmentado
+    type: 1,
     muestra: 70,
     age_start: null as number | null,
     age_end: null as number | null,
@@ -122,7 +123,16 @@ function StudiesCommerce({
 
     try {
       const response = await uploadStudyImage(selectedImage);
-      return response.url || response.data?.url;
+      console.log(response, "response");
+      const imageUrl = response?.data?.data?.url;
+
+      if (!imageUrl) {
+        throw new Error(
+          "No se encontró la URL de la imagen en la respuesta del servidor."
+        );
+      }
+
+      return imageUrl;
     } catch (error) {
       console.error("Error uploading image:", error);
       Swal.fire("Error", "No se pudo subir la imagen.", "error");
@@ -145,78 +155,61 @@ function StudiesCommerce({
       return;
     }
 
-    // Validar título y descripción
-    if (!studyDetails.titulo.trim()) {
-      Swal.fire("Error", "El título del estudio es obligatorio.", "error");
+    // Validate basic study details
+    const titleError = studiesValidations.validateStudyTitle(
+      studyDetails.titulo
+    );
+    if (titleError) {
+      Swal.fire("Error", titleError, "warning");
       return;
     }
 
-    if (!studyDetails.descripcion.trim()) {
-      Swal.fire("Error", "La descripción del estudio es obligatoria.", "error");
-      return;
-    }
-    // Validar selección de distritos para estudios segmentados - NUEVO
-    if (studyDetails.type === 2 && selectedDistritos.length === 0) {
-      Swal.fire({
-        icon: "warning",
-        title: "Selección de distritos",
-        text: "Debe seleccionar al menos un distrito para el estudio segmentado.",
-        showClass: {
-          popup: "animate__animated animate__fadeInDown",
-        },
-      });
-      return;
-    }
-    // Validar que haya al menos una pregunta activa
-    const activeQuestions = preguntas.filter((q) => !q.delete);
-    if (activeQuestions.length === 0) {
-      Swal.fire({
-        icon: "warning",
-        title: "Estudio vacío",
-        text: "Debes agregar al menos una pregunta al estudio.",
-        showClass: {
-          popup: "animate__animated animate__fadeInDown",
-        },
-      });
+    const descriptionError = studiesValidations.validateStudyDescription(
+      studyDetails.descripcion
+    );
+    if (descriptionError) {
+      Swal.fire("Error", descriptionError, "warning");
       return;
     }
 
-    for (let i = 0; i < activeQuestions.length; i++) {
-      const question = activeQuestions[i];
-      const validation = validateQuestionAnswers(question);
-
-      if (!validation.isValid) {
-        Swal.fire({
-          icon: "warning",
-          title: "Validación incompleta",
-          text: `Pregunta ${i + 1}: ${validation.error}`,
-          showClass: {
-            popup: "animate__animated animate__fadeInDown",
-          },
-        });
-        return;
-      }
-
-      // Validación adicional para las respuestas
-      const activeAnswers = question.answers.filter((a) => !a.delete);
-      const emptyAnswers = activeAnswers.filter(
-        (a) => !validateAnswerContent(a)
-      );
-
-      if (emptyAnswers.length > 0) {
-        Swal.fire({
-          icon: "warning",
-          title: "Respuestas incompletas",
-          text: `Hay respuestas vacías en la pregunta ${
-            i + 1
-          }. Todas las respuestas deben tener contenido.`,
-          showClass: {
-            popup: "animate__animated animate__fadeInDown",
-          },
-        });
-        return;
-      }
+    const sampleSizeError = studiesValidations.validateSampleSize(
+      studyDetails.muestra
+    );
+    if (sampleSizeError) {
+      Swal.fire("Error", sampleSizeError, "warning");
+      return;
     }
+
+    // Validate study image
+    const imageError = studiesValidations.validateStudyImage(
+      selectedImage || studyDetails.imagen,
+      isEditing
+    );
+    if (imageError) {
+      Swal.fire("Error", imageError, "warning");
+      return;
+    }
+
+    // Validate segmentation for segmented studies
+    const segmentationError = studiesValidations.validateStudySegmentation(
+      studyDetails.type,
+      studyDetails.gender,
+      studyDetails.age_start,
+      studyDetails.age_end,
+      selectedDistritos
+    );
+    if (segmentationError) {
+      Swal.fire("Error", segmentationError, "warning");
+      return;
+    }
+
+    // Validate question set
+    const questionSetError = studiesValidations.validateQuestionSet(preguntas);
+    if (questionSetError) {
+      Swal.fire("Error", questionSetError, "warning");
+      return;
+    }
+
     setIsLoading(true);
     try {
       // Subir imagen si hay una nueva seleccionada
@@ -227,8 +220,8 @@ function StudiesCommerce({
           imageUrl = uploadedImageUrl;
         }
       }
-      // Preparar distritos para enviar al backend - NUEVO
-      // Convertir el array de distritos a string separado por comas
+
+      // Preparar distritos para enviar al backend
       const distritosToSend =
         selectedDistritos.length > 0
           ? selectedDistritos.join(",")
@@ -237,7 +230,7 @@ function StudiesCommerce({
           : "";
 
       const formData = {
-        branch_id: Number(branchId),
+        branch_id: branchId,
         titulo: studyDetails.titulo,
         descripcion: studyDetails.descripcion,
         type: studyDetails.type,
@@ -287,22 +280,10 @@ function StudiesCommerce({
           }),
       };
 
-      // Validación final para asegurar que no haya respuestas vacías
-      const hasEmptyAnswers = formData.questions.some((q) =>
-        q.answers.some((a) => !a.respuesta.trim())
+      console.log(
+        "Payload enviado al backend:",
+        JSON.stringify(formData, null, 2)
       );
-
-      if (hasEmptyAnswers) {
-        Swal.fire({
-          icon: "warning",
-          title: "Validación fallida",
-          text: "Todas las respuestas deben tener contenido antes de guardar.",
-          showClass: {
-            popup: "animate__animated animate__fadeInDown",
-          },
-        });
-        return;
-      }
 
       if (isEditing && currentStudyId) {
         await updateStudy(currentStudyId, formData);
@@ -363,11 +344,9 @@ function StudiesCommerce({
     try {
       setIsLoading(true);
 
-      // Usar el servicio existente para obtener los detalles del estudio
       const response = await getStudyById(row.id);
       const studyData = response.data;
 
-      // Establecer los datos del estudio
       setStudyDetails({
         titulo: studyData.titulo,
         descripcion: studyData.descripcion,
@@ -376,7 +355,9 @@ function StudiesCommerce({
         age_start: studyData.age_start || null,
         age_end: studyData.age_end || null,
         gender: studyData.gender || null,
-        district: studyData.district ? Number(studyData.district.split(',')[0]) : null,
+        district: studyData.district
+          ? Number(studyData.district.split(",")[0])
+          : null,
         imagen: studyData.imagen || "",
       });
 
@@ -447,12 +428,11 @@ function StudiesCommerce({
   };
 
   const clearForm = () => {
-    // Restablecer detalles del estudio
     setStudyDetails({
       titulo: "",
       descripcion: "",
       type: 1,
-      muestra: 70,
+      muestra: 0,
       age_start: null,
       age_end: null,
       gender: null,
@@ -460,18 +440,15 @@ function StudiesCommerce({
       imagen: "",
     });
 
-    // Limpiar imagen
     setSelectedImage(null);
     setImagePreview(null);
 
-    // Resetear ubicación - NUEVO
     setSelectedDepartamento(null);
     setSelectedProvincia(null);
     setSelectedDistritos([]);
 
-    // Crear una pregunta inicial con dos respuestas por defecto
     const preguntaInicial = {
-      id: Date.now(), // ID temporal para el frontend
+      id: Date.now(),
       pregunta: "",
       answers: [
         {
@@ -491,19 +468,16 @@ function StudiesCommerce({
     setPreguntas([preguntaInicial]);
   };
 
-  // Función para validar que una respuesta tenga contenido
   const validateAnswerContent = (answer: StudyAnswer): boolean => {
     return answer.respuesta.trim() !== "";
   };
 
-  // Función mejorada para validar las respuestas de una pregunta
   const validateQuestionAnswers = (
     question: StudyQuestion
   ): {
     isValid: boolean;
     error?: string;
   } => {
-    // Verificar que la pregunta tenga contenido
     if (!question.pregunta.trim()) {
       return {
         isValid: false,
@@ -511,10 +485,8 @@ function StudiesCommerce({
       };
     }
 
-    // Filtrar respuestas válidas (no eliminadas)
     const activeAnswers = question.answers.filter((answer) => !answer.delete);
 
-    // Verificar que haya al menos 2 respuestas
     if (activeAnswers.length < 2) {
       return {
         isValid: false,
@@ -522,7 +494,6 @@ function StudiesCommerce({
       };
     }
 
-    // Verificar que todas las respuestas tengan contenido
     const emptyAnswerIndex = activeAnswers.findIndex(
       (answer) => !validateAnswerContent(answer)
     );
@@ -544,7 +515,6 @@ function StudiesCommerce({
     for (let i = 0; i < preguntas.length; i++) {
       const pregunta = preguntas[i];
       if (!pregunta.delete) {
-        // Solo validar preguntas no eliminadas
         const validation = validateQuestionAnswers(pregunta);
         if (!validation.isValid) {
           return {
@@ -581,9 +551,8 @@ function StudiesCommerce({
       return;
     }
 
-    // Añadir nueva pregunta con ID temporal
     const newQuestion: StudyQuestion = {
-      id: Date.now(), // ID temporal para el frontend
+      id: Date.now(),
       pregunta: "",
       answers: [],
       delete: false,
@@ -597,10 +566,8 @@ function StudiesCommerce({
       const questionToDelete = prevPreguntas[index];
 
       if (isNewQuestion(questionToDelete.id)) {
-        // Si es una pregunta nueva, la eliminamos completamente del array
         return prevPreguntas.filter((_, i) => i !== index);
       } else {
-        // Si es una pregunta del backend, la marcamos como eliminada
         return prevPreguntas.map((q, i) =>
           i === index ? { ...q, delete: true } : q
         );
@@ -619,30 +586,27 @@ function StudiesCommerce({
     e: React.ChangeEvent<
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
     >
-  ) => {
+  ): void => {
     const { name, value } = e.target;
+    let newValue: string | number | null = value === "" ? null : value;
 
-    // Registra el valor para depuración
-    console.log(`Cambiando ${name} a:`, value, typeof value);
+    if (name === "age_start" || name === "age_end") {
+      const numValue = value === "" ? null : Number(value);
+      if (numValue !== null) {
+        if (name === "age_start" && numValue < 14) newValue = 14;
+        if (name === "age_end" && numValue > 130) newValue = 130;
+      }
+    }
 
     setStudyDetails((prev) => ({
       ...prev,
       [name]:
-        value === ""
+        newValue === null
           ? null
-          : name === "type" ||
-            name === "muestra" ||
-            name === "age_start" ||
-            name === "age_end" ||
-            name === "district"
-          ? Number(value)
+          : name === "age_start" || name === "age_end"
+          ? Number(newValue)
           : value,
     }));
-
-    // Log después del cambio para verificar
-    if (name === "type") {
-      console.log("Nuevo tipo después del cambio:", Number(value));
-    }
   };
 
   const columns: Column[] = [
@@ -661,7 +625,7 @@ function StudiesCommerce({
               height="24"
             />
             <span className="ml-0 opacity-0 translate-x-[-10px] group-hover:opacity-100 group-hover:translate-x-0 group-hover:ml-2 transition-all duration-500 ease-in-out delay-100">
-              {isEditing ? "Editar" : "Estadística"}
+              Estadística
             </span>
           </button>
         </div>
@@ -717,117 +681,52 @@ function StudiesCommerce({
                 </div>
               </div>
 
-              {/* Detalles generales del estudio */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                <div>
-                  <label className="block text-gray-700 dark:text-white font-medium mb-2">
-                    Título del Estudio:
-                  </label>
-                  <input
-                    type="text"
-                    name="titulo"
-                    value={studyDetails.titulo}
-                    onChange={handleDetailChange}
-                    placeholder="Título del estudio"
-                    className="w-full rounded border border-stroke dark:border-strokedark py-2 px-4 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-boxdark dark:text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-gray-700 dark:text-white font-medium mb-2">
-                    Muestra (n°):
-                  </label>
-                  <input
-                    type="number"
-                    name="muestra"
-                    value={studyDetails.muestra || ""}
-                    onChange={handleDetailChange}
-                    placeholder="Tamaño de muestra"
-                    className="w-full rounded border border-stroke dark:border-strokedark py-2 px-4 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-boxdark dark:text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-gray-700 dark:text-white font-medium mb-2">
-                    Tipo de Estudio:
-                  </label>
-                  <select
-                    name="type"
-                    value={studyDetails.type}
-                    onChange={handleDetailChange}
-                    className="w-full rounded border border-stroke dark:border-strokedark py-2 px-4 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-boxdark dark:text-white"
-                  >
-                    <option value={1}>General</option>
-                    <option value={2}>Segmentado</option>
-                  </select>
-                </div>
-                <p></p>
-                {/* Mostrar estos campos solo si es estudio segmentado */}
-                {studyDetails.type === 2 && (
-                  <>
-                    <div>
-                      <label className="block text-gray-700 dark:text-white font-medium mb-2">
-                        Género:
-                      </label>
-                      <select
-                        name="gender"
-                        value={studyDetails.gender || ""}
-                        onChange={handleDetailChange}
-                        className="w-full rounded border border-stroke dark:border-strokedark py-2 px-4 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-boxdark dark:text-white"
-                      >
-                        <option value="">Todos</option>
-                        <option value="M">Masculino</option>
-                        <option value="F">Femenino</option>
-                      </select>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-gray-700 dark:text-white font-medium mb-2">
-                          Edad Min:
-                        </label>
-                        <input
-                          type="number"
-                          name="age_start"
-                          value={studyDetails.age_start || ""}
-                          onChange={handleDetailChange}
-                          placeholder="Edad mínima"
-                          className="w-full rounded border border-stroke dark:border-strokedark py-2 px-4 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-boxdark dark:text-white"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-gray-700 dark:text-white font-medium mb-2">
-                          Edad Max:
-                        </label>
-                        <input
-                          type="number"
-                          name="age_end"
-                          value={studyDetails.age_end || ""}
-                          onChange={handleDetailChange}
-                          placeholder="Edad máxima"
-                          className="w-full rounded border border-stroke dark:border-strokedark py-2 px-4 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-boxdark dark:text-white"
-                        />
-                      </div>
-                    </div>
-                    <div className="md:col-span-2 mt-4">
-                      <label className="block text-gray-700 dark:text-white font-medium mb-2">
-                        Ubicación:
-                      </label>
-                      <CascadingLocationDropdown
-                        departamentos={DEPARTAMENTOS}
-                        provincias={PROVINCIAS}
-                        distritos={DISTRITOS}
-                        selectedDepartamento={selectedDepartamento}
-                        selectedProvincia={selectedProvincia}
-                        selectedDistritos={selectedDistritos}
-                        onDepartamentoChange={handleDepartamentoChange}
-                        onProvinciaChange={handleProvinciaChange}
-                        onDistritosChange={handleDistritosChange}
-                        maxDistritos={5}
-                      />
-                    </div>
-                  </>
-                )}
-                <div className="md:col-span-2 flex flex-col md:flex-row gap-4">
-                  <div className="w-full md:w-1/2">
+              {/* Detalles generales del estudio - Información Básica */}
+              <div className="bg-white dark:bg-gray-900 p-5 rounded-lg border border-gray-100 dark:border-gray-800 mb-6">
+                <h3 className="text-lg font-medium mb-4 text-gray-800 dark:text-gray-200">
+                  Información Básica
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-gray-700 dark:text-white font-medium mb-2">
+                      Título del Estudio:
+                    </label>
+                    <input
+                      type="text"
+                      name="titulo"
+                      value={studyDetails.titulo}
+                      onChange={handleDetailChange}
+                      placeholder="Título del estudio"
+                      className="w-full rounded border border-stroke dark:border-strokedark py-2 px-4 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-boxdark dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-gray-700 dark:text-white font-medium mb-2">
+                      Muestra (n°):
+                    </label>
+                    <input
+                      type="number"
+                      name="muestra"
+                      value={studyDetails.muestra || ""}
+                      onChange={handleDetailChange}
+                      placeholder="Tamaño de muestra"
+                      className="w-full rounded border border-stroke dark:border-strokedark py-2 px-4 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-boxdark dark:text-white"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-gray-700 dark:text-white font-medium mb-2">
+                      Descripción:
+                    </label>
+                    <textarea
+                      name="descripcion"
+                      value={studyDetails.descripcion}
+                      onChange={handleDetailChange}
+                      placeholder="Descripción del estudio"
+                      className="w-full h-[100px] rounded border border-stroke dark:border-strokedark py-2 px-4 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-boxdark dark:text-white"
+                      rows={4}
+                    />
+                  </div>
+                  <div className="md:col-span-2">
                     <label className="block text-gray-700 dark:text-white font-medium mb-2">
                       Imagen:
                     </label>
@@ -847,21 +746,132 @@ function StudiesCommerce({
                       className="w-full rounded border border-stroke py-3 px-4 text-black dark:text-white dark:border-strokedark dark:bg-boxdark focus:border-primary"
                     />
                   </div>
+                </div>
+              </div>
 
-                  <div className="w-full md:w-1/2">
-                    <label className="block text-gray-700 dark:text-white font-medium mb-2">
-                      Descripción:
+              {/* Alcance del Estudio */}
+              <div className="bg-white dark:bg-gray-900 p-5 rounded-lg border border-gray-100 dark:border-gray-800 mb-6">
+                <h3 className="text-lg font-medium mb-4 text-gray-800 dark:text-gray-200">
+                  Alcance del Estudio
+                </h3>
+                <div className="form-group mb-4">
+                  <label className="block text-gray-700 dark:text-white font-medium mb-2">
+                    Selecciona el tipo de estudio:
+                  </label>
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <label className="flex items-center p-3 border rounded-md cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-800">
+                      <input
+                        type="radio"
+                        name="type"
+                        value="1"
+                        checked={studyDetails.type === 1}
+                        onChange={handleDetailChange}
+                        className="mr-3"
+                      />
+                      <div>
+                        <span className="font-medium block mb-1">General</span>
+                        <span className="text-sm text-gray-500 dark:text-gray-400">
+                          Enviar a todos los usuarios disponibles
+                        </span>
+                      </div>
                     </label>
-                    <textarea
-                      name="descripcion"
-                      value={studyDetails.descripcion}
-                      onChange={handleDetailChange}
-                      placeholder="Descripción del estudio"
-                      className="w-full h-[85%] rounded border border-stroke dark:border-strokedark py-2 px-4 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-boxdark dark:text-white"
-                      rows={5}
-                    />
+                    <label className="flex items-center p-3 border rounded-md cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-800">
+                      <input
+                        type="radio"
+                        name="type"
+                        value="2"
+                        checked={studyDetails.type === 2}
+                        onChange={handleDetailChange}
+                        className="mr-3"
+                      />
+                      <div>
+                        <span className="font-medium block mb-1">
+                          Segmentado
+                        </span>
+                        <span className="text-sm text-gray-500 dark:text-gray-400">
+                          Enviar según criterios demográficos
+                        </span>
+                      </div>
+                    </label>
                   </div>
                 </div>
+
+                {/* Campos de segmentación */}
+                {studyDetails.type === 2 && (
+                  <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-md mt-4 border border-gray-200 dark:border-gray-700">
+                    <h4 className="text-md font-medium mb-3 text-gray-700 dark:text-gray-300">
+                      Criterios de Segmentación
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">
+                          Género:
+                        </label>
+                        <select
+                          name="gender"
+                          value={studyDetails.gender || ""}
+                          onChange={handleDetailChange}
+                          className="w-full rounded border border-stroke py-2 px-4 dark:bg-boxdark dark:border-strokedark dark:text-white"
+                        >
+                          <option value="">Todos</option>
+                          <option value="M">Masculino</option>
+                          <option value="F">Femenino</option>
+                        </select>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-sm font-medium mb-1">
+                            Edad Mínima: <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="number"
+                            name="age_start"
+                            min="14"
+                            max="130"
+                            value={studyDetails.age_start ?? ""}
+                            onChange={handleDetailChange}
+                            className="w-full rounded border border-stroke py-2 px-4 dark:bg-boxdark dark:border-strokedark dark:text-white"
+                            required={studyDetails.type === 2}
+                            placeholder="Mínimo 14"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">
+                            Edad Máxima: <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="number"
+                            name="age_end"
+                            min="14"
+                            max="130"
+                            value={studyDetails.age_end ?? ""}
+                            onChange={handleDetailChange}
+                            className="w-full rounded border border-stroke py-2 px-4 dark:bg-boxdark dark:border-strokedark dark:text-white"
+                            required={studyDetails.type === 2}
+                            placeholder="Máximo 130"
+                          />
+                        </div>
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium mb-1">
+                          Ubicación:
+                        </label>
+                        <CascadingLocationDropdown
+                          departamentos={DEPARTAMENTOS}
+                          provincias={PROVINCIAS}
+                          distritos={DISTRITOS}
+                          selectedDepartamento={selectedDepartamento}
+                          selectedProvincia={selectedProvincia}
+                          selectedDistritos={selectedDistritos}
+                          onDepartamentoChange={handleDepartamentoChange}
+                          onProvinciaChange={handleProvinciaChange}
+                          onDistritosChange={handleDistritosChange}
+                          maxDistritos={5}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Preguntas y respuestas */}
@@ -888,14 +898,12 @@ function StudiesCommerce({
                         placeholder="Escribe tu pregunta aquí (máx. 50 caracteres)"
                         className="w-full rounded border border-stroke dark:border-strokedark py-2 px-4 mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-boxdark dark:text-white transition-colors duration-300"
                       />
-
                       <button
                         onClick={() => deleteQuestion(index)}
                         className="text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 mb-4 transition-colors duration-300"
                       >
                         Eliminar Pregunta
                       </button>
-
                       <label className="block text-gray-700 dark:text-white font-medium mb-2">
                         Respuestas:
                       </label>
@@ -927,7 +935,6 @@ function StudiesCommerce({
                             </button>
                           </div>
                         ))}
-
                       <button
                         onClick={() => addAnswer(index)}
                         className="text-blue-500 dark:text-blue-400 hover:text-blue-600 dark:hover:text-blue-300 transition-colors duration-300"
@@ -973,7 +980,7 @@ function StudiesCommerce({
         <TablaItem
           data={data}
           columns={columns}
-          title="Mis Estudios"
+          title="Mis Estudios de mercado"
           showBackButton={true}
           onBackClick={onBackClick}
           buttonLabel="Nuevo Estudio"

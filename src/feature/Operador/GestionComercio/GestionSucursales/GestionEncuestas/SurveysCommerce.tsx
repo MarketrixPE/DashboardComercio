@@ -83,6 +83,8 @@ function SurveysCommerce({
   };
 
   const handleSubmit = async () => {
+    console.log(branchId, "branchId");
+
     if (!branchId) {
       Swal.fire("Error", "No se ha seleccionado una sucursal válida.", "error");
       return;
@@ -142,7 +144,7 @@ function SurveysCommerce({
     setIsLoading(true);
     try {
       const formData = {
-        branch_id: Number(branchId),
+        branch_id: branchId,
         questions: preguntas
           .filter((q) => {
             return !q.delete || (!isNewQuestion(q.id) && q.delete);
@@ -263,7 +265,7 @@ function SurveysCommerce({
   };
 
   const onEdit = async (row: RowData) => {
-    setIsEditing(true);
+    setIsEditing(true); 
     setCurrentSurveyId(row.id);
     setShowForm(true);
     setIsLoading(true);
@@ -306,28 +308,6 @@ function SurveysCommerce({
       setIsLoading(false);
     }
   };
-
-  //Se oculto el delete
-  // const onDelete = async (row: RowData) => {
-  //   Swal.fire({
-  //     title: "¿Estás seguro?",
-  //     text: `Se eliminará la encuesta "${row.titulo}". Esta acción no se puede deshacer.`,
-  //     icon: "warning",
-  //     showCancelButton: true,
-  //     confirmButtonText: "Sí, eliminar",
-  //     cancelButtonText: "Cancelar",
-  //   }).then(async (result) => {
-  //     if (result.isConfirmed) {
-  //       try {
-  //         await deleteSurvey(row.id);
-  //         Swal.fire("Eliminado", "La encuesta ha sido eliminada.", "success");
-  //         fetchSurveys();
-  //       } catch (error) {
-  //         Swal.fire("Error", "No se pudo eliminar la encuesta.", "error");
-  //       }
-  //     }
-  //   });
-  // };
 
   const deleteAnswer = (
     questionIndex: number,
@@ -559,6 +539,7 @@ function SurveysCommerce({
     return "bg-primary text-gray hover:bg-opacity-90";
   };
 
+  
   return (
     <div className="container mx-auto my-8">
       {showForm ? (
