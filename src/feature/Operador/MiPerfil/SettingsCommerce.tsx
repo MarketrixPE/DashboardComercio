@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom"; // Importa useNavigate para redirigir
 import Uploader from "../../../shared/components/Atoms/Uploader";
 import { fetchProfile, updateProfile } from "../../../core/services/Operador/Perfil/ProfileService";
-
+import Cookies from "js-cookie";
 
 const SettingsCommerce = () => {
   const navigate = useNavigate();
@@ -12,7 +12,7 @@ const SettingsCommerce = () => {
     last_name: "",
     email: "",
     alias: "",
-    uuid: localStorage.getItem("commerce_uuid") || "",
+    uuid: Cookies.get("commerce_uuid") || "",
   });
   const [password, setPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
@@ -20,8 +20,6 @@ const SettingsCommerce = () => {
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
 
   useEffect(() => {
-
-    // Cargar el perfil solo si hay un uuid disponible
     const loadProfile = async () => {
       try {
         const data = await fetchProfile(profileData.uuid);
@@ -34,7 +32,6 @@ const SettingsCommerce = () => {
     loadProfile();
   }, [profileData.uuid, navigate]);
 
-  // Verificación directa de si el formulario está completo
   const isFormComplete = 
     profileData.name.trim() &&
     profileData.last_name.trim() &&
@@ -139,7 +136,7 @@ const SettingsCommerce = () => {
                 }}
                 initialPreview={imagePreviewUrl ?? undefined}
                 accept="image/jpeg, image/jpg, image/png"
-                maxSize={10 * 1024 * 1024}
+                maxSize={100 * 1024 * 1024}
                 label="Click para subir o arrastra y suelta"
                 className="w-full"
               />

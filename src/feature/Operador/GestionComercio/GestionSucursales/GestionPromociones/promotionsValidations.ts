@@ -12,7 +12,7 @@ export const promotionsValidations = {
   validatePromotionDescription: (description: string): string | undefined => {
     const requiredError = commonValidations.validateRequired(description, "descripción de la promoción");
     if (requiredError) return requiredError;
-    
+     
     return commonValidations.validateLength(description, 10, 500, "descripción de la promoción");
   },
 

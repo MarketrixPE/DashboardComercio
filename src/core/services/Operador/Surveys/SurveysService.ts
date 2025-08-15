@@ -40,17 +40,17 @@ export const getSurveysByBranch = async (
     const response = await commerceClient.post(`${API_URL}/branch`, {
       branch_id: branchId,
     });
-    return response.data.data || [];
+    return response.data?.data && Array.isArray(response.data.data)
+      ? response.data.data
+      : [];
   } catch (error: any) {
+    console.warn("Error fetching surveys:", error.response?.data || error);
     if (error.response?.status === 404) {
-      console.warn("No hay encuestas disponibles.");
       return [];
-    } else {
-      const errorMessage =
-        error.response?.data?.message || "Error al obtener las encuestas.";
-      console.error("Error en el servicio de encuestas:", errorMessage);
-      throw new Error(errorMessage);
     }
+    const errorMessage =
+      error.response?.data?.message || "Error al obtener las encuestas.";
+    throw new Error(errorMessage);
   }
 };
 
@@ -111,6 +111,42 @@ export const deleteSurvey = async (id: number): Promise<void> => {
     }
     console.error(
       "Error en el servicio de eliminación de encuesta:",
+      errorMessage
+    );
+    throw new Error(errorMessage);
+  }
+};
+
+export const generateSurveySuggestions = async (
+  branchId: string,
+  theme: string,
+  image?: File
+): Promise<{ branch_id: string; questions: Question[] }> => {
+  try {
+    const formData = new FormData();
+    formData.append("branch_id", branchId);
+    formData.append("theme", theme);
+    if (image) {
+      formData.append("image", image);
+    }
+
+    const response = await commerceClient.post(`${API_URL}/generate`, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+
+    return response.data.data;
+  } catch (error: any) {
+    let errorMessage = "Error al generar sugerencias de encuesta.";
+    if (error.response) {
+      errorMessage =
+        error.response.data?.message ||
+        error.response.statusText ||
+        errorMessage;
+    }
+    console.error(
+      "Error en el servicio de generación de sugerencias:",
       errorMessage
     );
     throw new Error(errorMessage);

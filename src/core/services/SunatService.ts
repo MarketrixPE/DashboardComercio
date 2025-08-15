@@ -13,7 +13,7 @@ export const validateRUC = async (ruc: string) => {
     console.log(data)
     return data; // Retorna la información de la empresa
   } catch (error: any) {
-    const errorMessage = error.response?.data?.message || "Error al consultar el RUC.";
+    const errorMessage = error.response?.data?.message || "Error al consultar el RUsssC.";
     throw new Error(errorMessage);
   }
 };

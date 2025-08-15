@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 import Logo from "../../../../assets/images/logo/logoPuntosSmart.svg";
 import { AdminMenu } from "./AdminMenu";
 import { ComercioMenu } from "./ComercioMenu";
+import Cookies from "js-cookie";
 
 interface SidebarProps {
   sidebarOpen: boolean;
@@ -15,11 +16,10 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
   const trigger = useRef<HTMLButtonElement | null>(null);
   const sidebar = useRef<HTMLDivElement | null>(null);
 
-  // Determinar rol dinámicamente desde localStorage
-  const userRole = localStorage.getItem("user_role");
+  const userRole = Cookies.get("user_role");
   const role = userRole === "2" ? "commerce" : userRole === "3" ? "branch_manager" : null;
 
-  const storedSidebarExpanded = localStorage.getItem("sidebar-expanded");
+  const storedSidebarExpanded = Cookies.get("sidebar-expanded");
   const [sidebarExpanded, setSidebarExpanded] = useState(
     storedSidebarExpanded === "true"
   );
@@ -52,7 +52,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
 
   // Manejar la expansión del sidebar
   useEffect(() => {
-    localStorage.setItem("sidebar-expanded", String(sidebarExpanded));
+    Cookies.set("sidebar-expanded", String(sidebarExpanded));
     document.body.classList.toggle("sidebar-expanded", sidebarExpanded);
   }, [sidebarExpanded]);
 

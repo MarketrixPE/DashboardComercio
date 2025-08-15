@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Swal from "sweetalert2";
 import { LoadingDots } from "../../../../../shared/components/Atoms/LoadingDots/LoadingDots";
 import TablaItem, {
@@ -68,6 +68,45 @@ function StudiesCommerce({
     null
   );
   const [selectedDistritos, setSelectedDistritos] = useState<number[]>([]);
+  const isModalShownRef = useRef(false);
+
+  useEffect(() => {
+    if (!isEditing || !currentStudyId) return;
+
+    const updateStats = async () => {
+      try {
+        const response = await getStudyById(currentStudyId);
+        const studyData = response.data;
+        setStudyStats({
+          total_preguntas: studyData.total_preguntas || 0,
+          rango_edades: studyData.rango_edades || {},
+          total_respuestas: studyData.total_respuestas || {
+            female_respuestas: 0,
+            male_respuestas: 0,
+          },
+          respuestas_por_distrito: studyData.respuestas_por_distrito || [],
+          preguntas_y_respuestas: studyData.preguntas_y_respuestas || [],
+        });
+      } catch (error) {
+        if (!isModalShownRef.current) {
+          isModalShownRef.current = true;
+          Swal.fire(
+            "Error",
+            "No se pudieron cargar las estadísticas del estudio.",
+            "error"
+          ).then(() => {
+            isModalShownRef.current = false;
+          });
+        }
+      }
+    };
+
+    updateStats();
+
+    const intervalId = setInterval(updateStats, 3000);
+
+    return () => clearInterval(intervalId);
+  }, [isEditing, currentStudyId]);
 
   const handleDepartamentoChange = (id: number) => {
     setSelectedDepartamento(id);
@@ -85,19 +124,33 @@ function StudiesCommerce({
   };
 
   const fetchStudies = async () => {
+    console.log("fetchStudies called with branchId:", branchId); // Debug
     if (!branchId) {
-      Swal.fire("Error", "No se ha seleccionado una sucursal válida.", "error");
+      if (!isModalShownRef.current) {
+        isModalShownRef.current = true;
+        Swal.fire(
+          "Error",
+          "No se ha seleccionado una sucursal válida.",
+          "error"
+        ).then(() => {
+          isModalShownRef.current = false;
+        });
+      }
       return;
     }
 
     setIsLoading(true);
     try {
       const response = await getStudiesByBranch(branchId);
-      if (response.length === 0) {
+      if (response.length === 0 && !isModalShownRef.current) {
+        console.log("Showing no studies modal"); // Debug
+        isModalShownRef.current = true;
         Swal.fire({
           icon: "info",
           title: "No hay estudios",
           text: "No hay estudios disponibles para mostrar.",
+        }).then(() => {
+          isModalShownRef.current = false;
         });
       }
       const formattedData = response.map((study: any) => ({
@@ -112,7 +165,14 @@ function StudiesCommerce({
       }));
       setData(formattedData);
     } catch (error) {
-      Swal.fire("Error", "No se pudieron cargar los estudios.", "error");
+      if (!isModalShownRef.current) {
+        isModalShownRef.current = true;
+        Swal.fire("Error", "No se pudieron cargar los estudios.", "error").then(
+          () => {
+            isModalShownRef.current = false;
+          }
+        );
+      }
     } finally {
       setIsLoading(false);
     }
@@ -140,13 +200,12 @@ function StudiesCommerce({
     }
   };
 
-  // Función auxiliar para determinar si una respuesta es nueva
   const isNewAnswer = (answerId?: number) => {
-    return !answerId || answerId >= 1000000000000; // IDs temporales serán timestamps
+    return !answerId || answerId >= 1000000000000;
   };
 
   const isNewQuestion = (questionId?: number) => {
-    return !questionId || questionId >= 1000000000000; // IDs temporales del frontend
+    return !questionId || questionId >= 1000000000000;
   };
 
   const handleSubmit = async () => {
@@ -361,6 +420,19 @@ function StudiesCommerce({
         imagen: studyData.imagen || "",
       });
 
+      setPreguntas(
+        studyData.preguntas_y_respuestas?.map((q: any) => ({
+          id: q.id,
+          pregunta: q.pregunta,
+          answers: q.respuestas.map((a: any) => ({
+            id: a.id,
+            respuesta: a.respuesta,
+            delete: false,
+          })),
+          delete: false,
+        })) || []
+      );
+
       setStudyStats({
         total_preguntas: studyData.total_preguntas || 0,
         rango_edades: studyData.rango_edades || {},
@@ -369,7 +441,7 @@ function StudiesCommerce({
           male_respuestas: 0,
         },
         respuestas_por_distrito: studyData.respuestas_por_distrito || [],
-        preguntas_y_respuestas: studyData.preguntas_y_respuestas,
+        preguntas_y_respuestas: studyData.preguntas_y_respuestas || [],
       });
 
       setCurrentStudyId(studyData.id);
@@ -377,12 +449,16 @@ function StudiesCommerce({
       setIsEditing(true);
       setShowForm(true);
     } catch (error) {
-      Swal.fire({
-        icon: "error",
-        title: "Error",
-        text: "No se pudieron cargar las estadísticas del estudio.",
-      });
-      console.error("Error al cargar estadísticas:", error);
+      if (!isModalShownRef.current) {
+        isModalShownRef.current = true;
+        Swal.fire(
+          "Error",
+          "No se pudieron cargar los datos del estudio.",
+          "error"
+        ).then(() => {
+          isModalShownRef.current = false;
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -466,6 +542,7 @@ function StudiesCommerce({
     };
 
     setPreguntas([preguntaInicial]);
+    setStudyStats(null); // Limpiar estadísticas al cerrar el formulario
   };
 
   const validateAnswerContent = (answer: StudyAnswer): boolean => {
@@ -530,10 +607,10 @@ function StudiesCommerce({
   };
 
   const addQuestion = () => {
-    if (preguntas.filter((q) => !q.delete).length >= 4) {
+    if (preguntas.filter((q) => !q.delete).length >= 10) {
       Swal.fire(
         "Límite alcanzado",
-        "Solo puedes agregar hasta 4 preguntas.",
+        "Solo puedes agregar hasta 10 preguntas.",
         "info"
       );
       return;
@@ -575,7 +652,6 @@ function StudiesCommerce({
     });
   };
 
-  // Actualizar el manejador de cambios de pregunta
   const handleQuestionChange = (index: number, value: string) => {
     setPreguntas((prevPreguntas) =>
       prevPreguntas.map((q, i) => (i === index ? { ...q, pregunta: value } : q))
@@ -590,7 +666,9 @@ function StudiesCommerce({
     const { name, value } = e.target;
     let newValue: string | number | null = value === "" ? null : value;
 
-    if (name === "age_start" || name === "age_end") {
+    if (name === "type") {
+      newValue = Number(value); // Convertir explícitamente a número
+    } else if (name === "age_start" || name === "age_end") {
       const numValue = value === "" ? null : Number(value);
       if (numValue !== null) {
         if (name === "age_start" && numValue < 14) newValue = 14;
@@ -603,7 +681,7 @@ function StudiesCommerce({
       [name]:
         newValue === null
           ? null
-          : name === "age_start" || name === "age_end"
+          : name === "age_start" || name === "age_end" || name === "type"
           ? Number(newValue)
           : value,
     }));
@@ -650,19 +728,26 @@ function StudiesCommerce({
     <div className="container mx-auto my-8">
       {showForm ? (
         <div className="formulario">
-          {isEditing && studyStats ? (
+          {isEditing ? (
             // En modo edición, mostrar las estadísticas
             <div className="mt-8">
               <div className="flex gap-4">
                 <i
                   className="fas fa-chevron-left text-white bg-[#1c2434] p-2 rounded-full flex items-center justify-center w-8 h-8 cursor-pointer"
-                  onClick={() => setShowForm(false)}
+                  onClick={() => {
+                    setShowForm(false);
+                    setStudyStats(null); // Limpiar estadísticas al cerrar
+                  }}
                 ></i>
                 <h2 className="text-2xl font-bold mb-6 text-black dark:text-white">
                   Estadísticas del Estudio
                 </h2>
               </div>
-              {studyStats && <StudyStatsView stats={studyStats} />}
+              {studyStats ? (
+                <StudyStatsView stats={studyStats} />
+              ) : (
+                <div className="text-gray-500">Cargando estadísticas...</div>
+              )}
             </div>
           ) : (
             <div className="flex flex-col gap-4 shadow-xl p-8 bg-white-translucent dark:bg-boxdark rounded-lg">
@@ -740,7 +825,7 @@ function StudiesCommerce({
                         reader.readAsDataURL(file);
                       }}
                       accept="image/jpeg, image/jpg, image/png"
-                      maxSize={10 * 1024 * 1024}
+                      maxSize={100 * 1024 * 1024}
                       label="Sube una imagen para el estudio"
                       initialPreview={imagePreview || studyDetails.imagen}
                       className="w-full rounded border border-stroke py-3 px-4 text-black dark:text-white dark:border-strokedark dark:bg-boxdark focus:border-primary"

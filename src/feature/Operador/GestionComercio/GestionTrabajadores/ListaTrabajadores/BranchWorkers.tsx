@@ -562,7 +562,7 @@ function BranchWorkers({
                 }}
                 initialPreview={avatarUrl ?? undefined}
                 accept="image/jpeg, image/jpg, image/png"
-                maxSize={10 * 1024 * 1024}
+                maxSize={100 * 1024 * 1024}
                 label="Sube tu foto o arrastra aquí"
               />
             </div>

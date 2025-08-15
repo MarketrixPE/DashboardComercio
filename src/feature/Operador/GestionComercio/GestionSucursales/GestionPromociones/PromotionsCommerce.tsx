@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Swal from "sweetalert2";
 import { LoadingDots } from "../../../../../shared/components/Atoms/LoadingDots/LoadingDots";
 import TablaItem, {
@@ -31,7 +31,7 @@ import { promotionsValidations } from "./promotionsValidations";
 interface PromotionsProps {
   branchId: string | null;
   selectedBranchName: string;
-  branchAddress: string;
+  branchAddress?: string;
   onBackClick?: () => void;
   latitud?: string;
   longitud?: string;
@@ -99,6 +99,7 @@ function PromotionsCommerce({
 
   const [showDetailModal, setShowDetailModal] = useState<boolean>(false);
   const [selectedPromotion, setSelectedPromotion] = useState<any>(null);
+  const hasShownNoPromotionsMessage = useRef<boolean>(false);
 
   // Manejadores para los cambios de ubicación
   const handleDepartamentoChange = (id: number) => {
@@ -126,7 +127,11 @@ function PromotionsCommerce({
 
   const fetchPromotions = async (): Promise<void> => {
     if (!branchId) {
-      Swal.fire("Error", "No se ha seleccionado una sucursal válida.", "error");
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "No se ha seleccionado una sucursal válida.",
+      });
       return;
     }
 
@@ -134,7 +139,8 @@ function PromotionsCommerce({
     try {
       const response = await getPromotionsByBranch(branchId);
 
-      if (response.length === 0) {
+      if (response.length === 0 && !hasShownNoPromotionsMessage.current) {
+        hasShownNoPromotionsMessage.current = true; // Marcar que el mensaje se mostró
         Swal.fire({
           icon: "info",
           title: "No hay promociones",
@@ -152,13 +158,39 @@ function PromotionsCommerce({
       }));
 
       setData(formattedData);
-    } catch (error) {
-      console.error("Error fetching promotions:", error);
-      Swal.fire("Error", "No se pudieron cargar las promociones.", "error");
+    } catch (error: any) {
+      console.error("Error fetching promotions:", error, error.response);
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "No se pudieron cargar las promociones.";
+      if (
+        errorMessage === "No se encontraron promociones" &&
+        !hasShownNoPromotionsMessage.current
+      ) {
+        hasShownNoPromotionsMessage.current = true; // Marcar que el mensaje se mostró
+        Swal.fire({
+          icon: "info",
+          title: "No hay promociones",
+          text: "No hay promociones disponibles para mostrar.",
+        });
+      } else if (errorMessage !== "No se encontraron promociones") {
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: errorMessage,
+        });
+      }
     } finally {
       setIsLoading(false);
     }
   };
+
+  // Modificar el useEffect para reiniciar la referencia cuando cambie branchId
+  useEffect(() => {
+    hasShownNoPromotionsMessage.current = false; // Reiniciar la referencia
+    fetchPromotions();
+  }, [branchId]);
 
   const getLocationCoords = (): LocationCoords => {
     if (latitud && longitud) {
@@ -638,7 +670,7 @@ function PromotionsCommerce({
     <div className="container mx-auto my-8">
       {/* Modal de detalle de promoción */}
       {showDetailModal && selectedPromotion && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black bg-opacity-50">
           <div className="bg-white dark:bg-boxdark p-6 rounded-lg w-full max-w-2xl mx-4">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold text-black dark:text-white">
@@ -728,7 +760,7 @@ function PromotionsCommerce({
               </button>
               <div className="flex flex-col">
                 <h2 className="text-title-md2 font-semibold text-black dark:text-white">
-                  Agregar Promoción a: {selectedBranchName}
+                  Agregar Promoción Smart a: {selectedBranchName}
                 </h2>
                 <p className="text-sm text-gray-600 dark:text-gray-300">
                   {branchAddress}
@@ -798,7 +830,7 @@ function PromotionsCommerce({
                         reader.readAsDataURL(file);
                       }}
                       accept="image/jpeg, image/jpg, image/png"
-                      maxSize={10 * 1024 * 1024}
+                      maxSize={100 * 1024 * 1024}
                       label="Sube una imagen para la promoción"
                       initialPreview={imagePreview || promotionDetails.imagen}
                       className="w-full rounded border border-stroke py-3 px-4 text-black dark:text-white dark:border-strokedark dark:bg-boxdark focus:border-primary"
@@ -978,7 +1010,7 @@ function PromotionsCommerce({
         <TablaItem
           data={data}
           columns={columns}
-          title="Mis Promociones"
+          title="Mis Promociones Smart"
           showBackButton={true}
           onBackClick={onBackClick}
           buttonLabel="Nueva Promoción"
@@ -991,7 +1023,7 @@ function PromotionsCommerce({
 
       {/* Modal de usuarios cercanos */}
       {showNearbyCustumersModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div className="fixed inset-0  z-[999] flex items-center justify-center bg-black bg-opacity-50">
           <div className="bg-white dark:bg-boxdark p-6 rounded-lg w-full max-w-lg mx-4">
             <h2 className="text-xl font-bold mb-4 text-black dark:text-white">
               {promotionDetails.promocionType === "basica"
@@ -1084,10 +1116,10 @@ function PromotionsCommerce({
                         ? `Hasta ${promotionDetails.age_end} años`
                         : "Todas las edades"}
                     </li>
-                    <li>
+                    {/* <li>
                       <span className="font-medium">Distritos:</span>{" "}
                       {promotionDetails.district || "Todos"}
-                    </li>
+                    </li> */}
                   </ul>
                 </div>
               )}

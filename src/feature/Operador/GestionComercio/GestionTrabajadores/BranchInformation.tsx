@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
-
 import Swal from "sweetalert2";
-
+import Cookies from "js-cookie";
 import { Icon } from "@iconify/react/dist/iconify.js";
 import { getBranchesByCompany } from "../../../../core/services/Operador/Branch/BranchCommerceService";
 import TablaItem, {
@@ -18,7 +17,7 @@ function BranchInformation() {
 
   const fetchBranches = async () => {
     try {
-      const companyId = localStorage.getItem("decrypted_company_id");
+      const companyId = Cookies.get("decrypted_company_id");
       if (!companyId) {
         Swal.fire({
           icon: "error",

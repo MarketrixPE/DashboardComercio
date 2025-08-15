@@ -75,7 +75,7 @@ export const couponValidations = {
     }
     
     if (image) {
-      const maxSize = 10 * 1024 * 1024; // 10MB
+      const maxSize = 100 * 1024 * 1024; // 10MB
       if (image.size > maxSize) {
         return "La imagen no debe superar los 10MB";
       }

@@ -12,7 +12,7 @@ interface ChartProps {
   chartType?: 'bar' | 'line';
   colors?: string[];
   height?: number;
-  widthClass?: string; // Nueva propiedad para personalizar la clase del ancho
+  widthClass?: string;
 }
 
 const ChartComponent: React.FC<ChartProps> = ({
@@ -22,15 +22,20 @@ const ChartComponent: React.FC<ChartProps> = ({
   chartType = 'bar',
   colors = ['#3C50E0', '#80CAEE', '#FF4560', '#00E396'],
   height = 348,
-  widthClass = 'w-full', // Por defecto w-4/5
+  widthClass = 'w-full',
 }) => {
+  const maxValue = Math.max(...series.flatMap(s => s.data), 1); 
+  const yAxisMax = Math.ceil(maxValue * 1.1); 
+
+  const shouldRotateLabels = categories.length > 5; 
+
   const options: ApexOptions = {
     colors,
     chart: {
       fontFamily: 'Satoshi, sans-serif',
       type: chartType,
       height,
-      stacked: false, // Desapilamos las barras
+      stacked: false,
       toolbar: {
         show: false,
       },
@@ -41,14 +46,30 @@ const ChartComponent: React.FC<ChartProps> = ({
     plotOptions: {
       bar: {
         horizontal: false,
-        columnWidth: '50%', // Ajusta el ancho de las columnas
+        columnWidth: '50%',
       },
     },
     dataLabels: {
       enabled: false,
     },
     xaxis: {
-      categories, // Categorías dinámicas basadas en los datos que pases
+      categories,
+      labels: {
+        rotate: shouldRotateLabels ? -45 : 0, 
+        trim: true,
+        hideOverlappingLabels: true,
+        style: {
+          fontSize: '12px',
+        },
+      },
+    },
+    yaxis: {
+      min: 0,
+      max: yAxisMax,
+      tickAmount: 5,
+      labels: {
+        formatter: (value) => Math.round(value).toString(),
+      },
     },
     legend: {
       position: 'top',
@@ -57,12 +78,12 @@ const ChartComponent: React.FC<ChartProps> = ({
       fontWeight: 500,
       fontSize: '14px',
       markers: {
-        size: 6, // Cambié `radius` a `size` para ajustar el tamaño del marcador
+        size: 6,
       },
     },
     fill: {
       opacity: 1,
-    },
+    }
   };
 
   return (
@@ -74,9 +95,8 @@ const ChartComponent: React.FC<ChartProps> = ({
           </h4>
         </div>
       </div>
-
       <div>
-        <div id="chart" className="">
+        <div id="chart" className="" role="img" aria-label={`Gráfico de ${title}`}>
           <ReactApexChart
             options={options}
             series={series}

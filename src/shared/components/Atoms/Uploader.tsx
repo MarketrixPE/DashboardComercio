@@ -13,7 +13,7 @@ interface UploaderProps {
 const Uploader: React.FC<UploaderProps> = ({
   onFileSelect,
   accept = "image/*",
-  maxSize = 10 * 1024 * 1024, // Cambiado a 2 MB
+  maxSize = 100 * 1024 * 1024, // Cambiado a 2 MB
   label = "Haga click para cargar o arrastrar y soltar",
   className = "",
   inputClassName = "",

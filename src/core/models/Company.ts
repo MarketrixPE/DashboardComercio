@@ -4,10 +4,18 @@ export interface Company {
   numero_documento: string;
   razon_social: string;
   nombre_comercial: string;
-  numeros_contacto: string; // Este campo sigue siendo relevante
-  logo: string; // Imagen del logo de la empresa
-  activo: number; // Estado activo o inactivo
-  membership_id: number; // ID del tipo de membresía
-  discount_plan_id: number; // ID del plan de descuentos
-  created_at: string; // Fecha de creación
+  numeros_contacto: string;
+  logo: string;
+  activo: number;
+  membership_id: number;
+  discount_plan_id: number;
+  created_at: string;
+
+  user?: {
+    id: number;
+    name: string;
+    last_name: string;
+    email: string;
+    phone: string;
+  };
 }

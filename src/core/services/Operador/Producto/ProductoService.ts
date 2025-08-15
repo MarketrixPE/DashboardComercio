@@ -13,28 +13,18 @@ export const getProductList = async () => {
   }
 };
 
-// Obtener la lista de tipos de productos
-export const getProductTypeList = async () => {
-  try {
-    const response = await commerceClient.get(`${API_BASE_URL}/productType`);
-    return response.data;
-  } catch (error) {
-    console.error("Error al obtener la lista de tipos de productos:", error);
-    throw error;
-  }
-};
 
 // Obtener la lista de productos por branchId
-export const getProductsByBranchId = async (branchId: any) => {
+export const getProductsByBranchId = async (branchId: string) => {
   try {
-    const response = await commerceClient.get(
-      `${API_BASE_URL}/product/branch/${branchId}`
-    );
+    const response = await commerceClient.post(`${API_BASE_URL}/product/branch`, {
+      branch_uuid: branchId,
+    });
     return response.data?.data || [];
   } catch (error: any) {
     if (error.response?.status === 404) {
       console.warn("No hay productos disponibles para esta sucursal.");
-      return []; // Retorna un array vacío
+      return [];
     }
     throw new Error(
       error.response?.data?.message || "Error al obtener los productos."
@@ -118,5 +108,20 @@ export const getSubcategoriesByCategoryId = async (categoryId: number) => {
   } catch (error: any) {
     console.error("Error al obtener subcategorías:", error);
     throw new Error("No se pudo obtener las subcategorías.");
+  }
+};
+
+
+export const generateSuggestions = async (title: string, image: File) => {
+  try {
+    const formData = new FormData();
+    formData.append("title", title);
+    formData.append("image", image);
+
+    const response = await commerceClient.post(`${API_BASE_URL}/product/generate-suggestions`,formData,);
+    return response.data;
+  } catch (error) {
+    console.error("Error al generar sugerencias para el producto:", error);
+    throw error;
   }
 };

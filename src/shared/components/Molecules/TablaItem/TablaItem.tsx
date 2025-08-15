@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Search, ChevronLeft, ChevronRight } from "lucide-react";
 
 export interface RowData {
@@ -47,6 +47,19 @@ const TablaItem: React.FC<TableProps> = ({
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Check for mobile view on mount and window resize
+  useEffect(() => {
+    const checkIsMobile = () => {
+      setIsMobile(window.innerWidth < 768); // 768px is typical md breakpoint
+    };
+
+    checkIsMobile(); // Check on mount
+    window.addEventListener("resize", checkIsMobile);
+
+    return () => window.removeEventListener("resize", checkIsMobile);
+  }, []);
 
   const filteredData = data.filter((row) =>
     Object.values(row).some(
@@ -64,7 +77,7 @@ const TablaItem: React.FC<TableProps> = ({
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
 
   return (
-    <div className="p-6 rounded-xl bg-whiteTrans border border-[#d6d6d6] dark:bg-boxdark dark:border-[#111827] shadow-sm">
+    <div className="p-4 md:p-6 rounded-xl bg-whiteTrans border border-[#d6d6d6] dark:bg-boxdark dark:border-[#111827] shadow-sm">
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <div className="flex items-center gap-3">
@@ -77,7 +90,7 @@ const TablaItem: React.FC<TableProps> = ({
             </button>
           )}
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">
               {title}
             </h1>
             {branchAddress && (
@@ -88,12 +101,12 @@ const TablaItem: React.FC<TableProps> = ({
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-          {extraControls}
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-1/2 justify-end">
+          <div className="w-[25%]">{extraControls}</div>
           {showNewButton && newButtonLabel && (
             <button
               onClick={onNewButtonClick}
-              className="px-4 py-2 text-primary border-2 border-primary rounded-lg hover:bg-primary/10 transition-colors font-medium"
+              className="px-4 py-2 text-primary border-2 border-primary rounded-lg hover:bg-primary/10 transition-colors font-medium whitespace-nowrap"
             >
               {newButtonLabel}
             </button>
@@ -101,7 +114,7 @@ const TablaItem: React.FC<TableProps> = ({
           {showButton && buttonLabel && (
             <button
               onClick={onButtonClick}
-              className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors font-medium"
+              className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors font-medium whitespace-nowrap"
             >
               {buttonLabel}
             </button>
@@ -138,40 +151,79 @@ const TablaItem: React.FC<TableProps> = ({
         </select>
       </div>
 
-      {/* Table Section */}
-      <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
-        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead className="bg-gray-50 dark:bg-gray-800">
-            <tr>
-              {columns.map((column, index) => (
-                <th
-                  key={index}
-                  className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-                >
-                  {column.Header}
-                </th>
+      {/* Mobile Cards View */}
+      {isMobile && (
+        <div className="space-y-4">
+          {paginatedData.map((row, rowIndex) => (
+            <div
+              key={rowIndex}
+              className="p-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm"
+            >
+              {columns.map((column, colIndex) => (
+                <div key={`${rowIndex}-${colIndex}`}>
+                  <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    {column.Header}:
+                  </span>
+                  <div className="mt-1 text-gray-900 dark:text-gray-100">
+                    {column.Cell
+                      ? column.Cell(row)
+                      : row[column.accessor as keyof RowData]}
+                  </div>
+                </div>
               ))}
-            </tr>
-          </thead>
-          <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-            {paginatedData.map((row, rowIndex) => (
-              <tr 
-                key={rowIndex}
-                className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-              >
-                {columns.map((column, colIndex) => (
-                  <td
-                    key={`${rowIndex}-${colIndex}`}
-                    className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100"
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Desktop Table View */}
+      {!isMobile && (
+        <div className="overflow-x-hidden rounded-lg border border-gray-200 dark:border-gray-700">
+          <table className="w-full table-auto divide-y divide-gray-200 dark:divide-gray-700">
+            <thead className="bg-gray-50 dark:bg-gray-800">
+              <tr>
+                {columns.map((column, index) => (
+                  <th
+                    key={index}
+                    scope="col"
+                    className={`px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider`}
                   >
-                    {column.Cell ? column.Cell(row) : row[column.accessor as keyof RowData]}
-                  </td>
+                    {column.Header}
+                  </th>
                 ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+              {paginatedData.map((row, rowIndex) => (
+                <tr
+                  key={rowIndex}
+                  className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors h-14"
+                >
+                  {columns.map((column, colIndex) => (
+                    <td
+                      key={`${rowIndex}-${colIndex}`}
+                      className={`px-6 py-4 text-sm text-gray-900 dark:text-gray-100 ${
+                        column.Header !== "Acciones"
+                          ? "truncate max-w-[200px]"
+                          : ""
+                      }`}
+                      title={
+                        column.Header !== "Acciones" && !column.Cell
+                          ? (row[column.accessor as keyof RowData] as string)
+                          : undefined
+                      }
+                    >
+                      {column.Cell
+                        ? column.Cell(row)
+                        : row[column.accessor as keyof RowData]}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Pagination Section */}
       <div className="flex items-center justify-between mt-6">
@@ -181,17 +233,17 @@ const TablaItem: React.FC<TableProps> = ({
           className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           <ChevronLeft className="w-4 h-4" />
-          Anterior
+          <span className="hidden sm:inline">Anterior</span>
         </button>
         <span className="text-sm text-gray-600 dark:text-gray-300">
-          Página {currentPage} de {totalPages}
+          {currentPage} / {totalPages}
         </span>
         <button
           disabled={currentPage === totalPages}
           onClick={() => setCurrentPage((prev) => prev + 1)}
           className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
-          Siguiente
+          <span className="hidden sm:inline">Siguiente</span>
           <ChevronRight className="w-4 h-4" />
         </button>
       </div>

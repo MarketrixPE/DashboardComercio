@@ -100,22 +100,21 @@ export const useFormValidation = () => {
       return "El apellido debe tener al menos 2 caracteres";
   };
 
-  const validateAlias = (alias: string): string | undefined => {
-    if (!alias) return "El alias es requerido"; // Primero validar si está vacío
-    if (alias.length < 3) return "El alias debe tener al menos 3 caracteres";
-    if (!/^[a-zA-Z0-9]+$/.test(alias))
-      return "El alias solo puede contener letras y números";
-  };
-
   const validateAvatar = (
-    avatar: File | null | undefined
+    avatar: File | null | undefined,
+    isRegister: boolean
   ): string | undefined => {
-    if (!avatar) return "El avatar es requerido"; // Primero validar si no hay archivo
-    if (avatar.size > 5 * 1024 * 1024) {
-      return "El avatar no debe superar los 5MB";
+    if (isRegister && !avatar) {
+      return "El avatar es requerido";
     }
-    if (!avatar.type.startsWith("image/")) {
-      return "El archivo debe ser una imagen";
+    if (avatar) {
+      const allowedTypes = ["image/jpeg", "image/jpg", "image/png"];
+      if (!allowedTypes.includes(avatar.type)) {
+        return "Solo se permiten archivos JPEG, JPG o PNG";
+      }
+      if (avatar.size > 100 * 1024 * 1024) {
+        return "El avatar no debe superar los 100MB";
+      }
     }
     return undefined;
   };
@@ -177,7 +176,6 @@ export const useFormValidation = () => {
     } else {
       newErrors.email = validateEmail(formData.email);
       newErrors.name = validateName(formData.name || "");
-      newErrors.alias = validateAlias(formData.alias || "");
 
       if (formData.birthDate) {
         newErrors.birthDate = validateBirthDate(formData.birthDate);
@@ -193,7 +191,6 @@ export const useFormValidation = () => {
 
       // Manejo específico de contraseñas según el contexto
       if ("isEditing" in formData) {
-        // Validaciones para SmartUsers
         newErrors.password = validateSmartUserPassword(
           formData.password,
           formData.isEditing
@@ -208,7 +205,6 @@ export const useFormValidation = () => {
             );
         }
       } else if (formData.isRegister) {
-        // Validaciones específicas para registro
         if (formData.ruc) {
           newErrors.ruc = validateRUC(formData.ruc);
         }
@@ -223,10 +219,7 @@ export const useFormValidation = () => {
         );
 
         newErrors.lastName = validateLastName(formData.lastName || "");
-
-        if (formData.avatar) {
-          newErrors.avatar = validateAvatar(formData.avatar);
-        }
+        newErrors.avatar = validateAvatar(formData.avatar, formData.isRegister); // Actualizado
         if (formData.nomComercio) {
           newErrors.nomComercio = validateNombreComercial(formData.nomComercio);
         }
@@ -243,11 +236,10 @@ export const useFormValidation = () => {
       }
     });
 
-    // Si hay errores, mostrarlos en Swal.fire
+    // Mostrar errores con Swal.fire
     if (Object.keys(newErrors).length > 0) {
       const errorMessages = Object.entries(newErrors)
         .map(([field, message]) => {
-          // Mapear nombres de campos a español
           const fieldTranslations: { [key: string]: string } = {
             email: "Correo",
             password: "Contraseña",

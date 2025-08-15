@@ -1,304 +1,62 @@
-/* Video background */
-.video-background {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: -1;
-  overflow: hidden;
-}
-
-.video-background video {
-  min-width: 100%;
-  min-height: 100%;
-  width: auto;
-  height: auto;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  object-fit: cover;
-}
-
-.video-background::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.5);
-}
-
-
 .card {
-  width: 100%;
+  position: relative;
+  width: 90%;
   height: 100%;
-  position: absolute;
   transform-style: preserve-3d;
-  transition: transform 0.8s ease;
+  transition: transform 0.6s ease;
+  margin: 0 3rem;
+  box-sizing: content-box;
 }
 
 .card.flipped {
   transform: rotateY(180deg);
-  
 }
 
-/* Formularios */
-.form {
+.card-front,
+.card-back {
   position: absolute;
   width: 100%;
-  background: #ffffff08;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+  height: 100%;
   backface-visibility: hidden;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-}
-
-.login-form {
-  transform: rotateY(0deg);
-  border: 1px solid #FFF;
-  background: #ffffff08;
-  backdrop-filter: blur(10px);
-}
-
-.register-form {
-  transform: rotateY(180deg);
-  border: 1px solid #FFF;
-}
-
-/* Estilos generales */
-.logo {
-  width: 80px;
-  margin: 0 auto 10px;
-}
-
-.input-group {
-  margin-bottom: 15px;
-}
-
-.input-group label {
-  display: block;
-  font-size: 0.9rem;
-  margin-bottom: 5px;
-}
-
-.input-group input {
-  width: 100%;
-  padding: 10px;
-  font-size: 1rem;
-  border: 1px solid #ccc;
-  border-radius: 5px;
-}
-
-.btn {
-  padding: 10px;
-  font-size: 1rem;
-  border: none;
-  border-radius: 5px;
-  background-color: #522fc7;
-  color: white;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-}
-.btn:disabled {
-  background-color: #9ca3af; /* Color gris cuando está deshabilitado */
-  cursor: not-allowed;
-  opacity: 0.7;
-}
-
-.btn-secondary {
-  background-color: #6c757d;
-  color: white;
-}
-
-.btn-secondary:hover {
-  background-color: #5a6268;
-}
-
-.btn-secondary:disabled {
-  background-color: #9ca3af;
-  cursor: not-allowed;
-  opacity: 0.7;
-}
-.btn:hover {
-  background-color: #0056b3;
-}
-
-.link {
-  color: #007bff;
-  background: none;
-  border: none;
-  cursor: pointer;
-  text-decoration: underline;
-}
-
-.link:hover {
-  color: #0056b3;
-}
-
-.error {
-  color: #ff0000;
-  font-size: 0.9rem;
-  text-align: center;
-  margin-bottom: 10px;
-}
-
-.thanks-card {
-  visibility: hidden;
-  opacity: 0;
-  transform: rotateY(0deg);
-  transition: visibility 0s, opacity 0.8s ease, transform 0.8s ease;
-}
-
-.card.show-thanks .thanks-card {
-  visibility: visible;
-  opacity: 1;
-  transform: rotateY(0deg);
-  transition: visibility 0s, opacity 0.3s ease, transform 0.3s ease;
-}
-
-.card.show-thanks .login-form,
-.card.show-thanks .register-form {
-  visibility: hidden;
-  opacity: 0;
-  transform: rotateY(0);
-  transition: visibility 0s, opacity 0.3s ease;
-}
-
-.grid-container {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-}
-
-.input-group {
-  margin-bottom: 15px;
-}
-
-/* Estilos para el efecto de máquina de escribir - agrega esto a tu SignUp.css */
-
-.typewriter-container {
-  display: inline-block;
-  height: 2.5rem;
-  vertical-align: text-top;
-}
-
-.typewriter {
-  color: #00d6bd;
-  font-weight: 500;
-  border-right: 2px solid #00d6bd;
-  white-space: nowrap;
   overflow: hidden;
-  animation: 
-    typing 3.5s steps(30, end) infinite,
-    blink-caret .75s step-end infinite;
-  width: 0;
 }
 
-.typewriter.active {
-  animation: 
-    typing 3.5s steps(30, end) forwards,
-    blink-caret .75s step-end infinite;
+.card-back {
+  transform: rotateY(180deg);
 }
 
-@keyframes typing {
-  from { width: 0 }
-  to { width: 100% }
-}
-
-@keyframes blink-caret {
-  from, to { border-color: transparent }
-  50% { border-color: #00d6bd }
-}
-
-@media (max-width: 768px) {
-  .card {
-    width: 100%;
-    max-width: 350px;
-    margin: 0 auto;
+/* Animaciones de entrada y salida */
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(50px);
   }
-  
-  .form {
-    padding: 1.25rem;
-  }
-  
-  /* Ajustes para el scrolling en formulario de registro */
-  .h-auto.max-h-80.overflow-y-auto {
-    max-height: 65vh;
-    padding-right: 0.5rem;
-  }
-  
-  /* Ajustes para botones en móvil */
-  .btn, .btn-secondary {
-    width: 100%;
-    font-size: 0.875rem;
-    padding: 0.625rem 1rem;
-  }
-  
-  /* Cambio a columna para botones en los formularios */
-  .flex.flex-col.sm\:flex-row {
-    gap: 0.5rem;
+  to {
+    opacity: 1;
+    transform: translateX(0);
   }
 }
 
-/* Ajustes para pantallas muy pequeñas */
-@media (max-width: 380px) {
-  .form {
-    padding: 1rem;
+@keyframes slideOutRight {
+  from {
+    opacity: 1;
+    transform: translateX(0);
   }
-  
-  h2 {
-    font-size: 1.1rem;
-  }
-  
-  .register-form h2 {
-    font-size: 1rem;
-  }
-  
-  .bg-\[\#3944eb\] {
-    padding: 0.375rem;
-    font-size: 0.8rem;
-  }
-  
-  input, select, textarea {
-    font-size: 0.875rem;
-    padding: 0.375rem 0.75rem;
+  to {
+    opacity: 0;
+    transform: translateX(50px);
   }
 }
 
-/* Optimizaciones adicionales para diferentes tamaños de pantalla */
-@media (min-width: 769px) and (max-width: 1024px) {
-  .w-1\/2 {
-    width: 55%;
-  }
-  
-  .max-w-2xl {
-    max-width: 36rem;
-  }
+.card-container {
+  animation-duration: 0.5s;
+  animation-fill-mode: both;
 }
 
-/* Mejoras para pantallas grandes */
-@media (min-width: 1600px) {
-  .p-\[5\%\] {
-    padding: 3% 8%;
-  }
+.card-container-enter {
+  animation-name: slideInRight;
 }
 
-/* Animación de shimmer para la línea decorativa */
-@keyframes shimmer {
-  100% {
-    transform: translateX(100%);
-  }
-}
-
-.animate-shimmer {
-  animation: shimmer 2s infinite;
+.card-container-exit {
+  animation-name: slideOutRight;
 }

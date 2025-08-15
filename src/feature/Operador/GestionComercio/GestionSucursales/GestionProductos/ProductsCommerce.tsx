@@ -1,36 +1,71 @@
 import { useEffect, useRef, useState } from "react";
 import Swal from "sweetalert2";
-import { Icon } from "@iconify/react";
 import { LoadingDots } from "../../../../../shared/components/Atoms/LoadingDots/LoadingDots";
 import Uploader from "../../../../../shared/components/Atoms/Uploader";
 import TablaItem, {
   RowData,
   Column,
 } from "../../../../../shared/components/Molecules/TablaItem/TablaItem";
-
 import {
   createProduct,
   deleteProduct,
   getCategories,
   getProductsByBranchId,
-  getProductTypeList,
   getSubcategoriesByCategoryId,
   showProduct,
   updateProduct,
+  generateSuggestions,
 } from "../../../../../core/services/Operador/Producto/ProductoService";
-
-import CouponsCommerce from "./GestionCupones/CouponsCommerce";
-import { Tooltip } from "react-tooltip";
 import CustomDropdown from "../../../../../shared/components/Atoms/Dropdown/Dropdown";
 import { productValidations } from "./ProductValidations";
+
+interface FormValues {
+  titulo: string;
+  descripcion_corta: string;
+  descripcion: string;
+  precio: string;
+  precio_sin_oferta: string;
+  sucursal: string;
+  coupon: number;
+  tipo: string;
+  activo: string;
+  likes: string;
+  rating: string;
+  tiene_descuento: string;
+  porcentaje_descuento: string;
+  fecha_vencimiento: string;
+  categories: number[];
+  subcategories: number[];
+  puntos: string;
+}
+
+interface Category {
+  id: number;
+  titulo: string;
+}
+
+interface Subcategory {
+  id: number;
+  descripcion: string;
+}
+
+interface ProductTypeOption {
+  id: number;
+  text: string;
+}
+
+interface EstadoCuponOption {
+  id: number;
+  text: string;
+}
 
 interface ProductsProps {
   branchId: string | null;
   selectedBranchName: string;
   branchAddress: string;
   onBackClick?: () => void;
-  inheritedCategory?: number | null;
-  inheritedSubcategory?: number | null;
+  inheritedCategory: number | null;
+  inheritedSubcategory: number | null;
 }
 
 export function ProductsCommerce({
@@ -43,9 +78,8 @@ export function ProductsCommerce({
 }: ProductsProps) {
   const [data, setData] = useState<RowData[]>([]);
   const [filteredData, setFilteredData] = useState<RowData[]>([]);
-  const [productTypes, setProductTypes] = useState<any[]>([]);
-  const [selectedType, setSelectedType] = useState("");
-  const [formValues, setFormValues] = useState({
+  const [selectedType, setSelectedType] = useState<string>("");
+  const [formValues, setFormValues] = useState<FormValues>({
     titulo: "",
     descripcion_corta: "",
     descripcion: "",
@@ -54,56 +88,92 @@ export function ProductsCommerce({
     sucursal: "",
     coupon: 0,
     tipo: "",
-    activo: "0",
+    activo: "1",
     likes: "0",
     rating: "0.00",
     tiene_descuento: "0",
-    porcentaje_descuento: "0.00",
+    porcentaje_descuento: "0",
     fecha_vencimiento: "",
     categories: [],
     subcategories: [],
+    puntos: "",
   });
-  const hasFetchedProducts = useRef(false);
+  const hasFetchedProducts = useRef<boolean>(false);
   const [imageFiles, setImageFiles] = useState<
     { file: File | null; url: string }[]
-  >([]);
-  const [isCouponView, setIsCouponView] = useState(false);
+  >([{ file: null, url: "" }]);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(
     null
   );
-  const [selectedProductTitle, setSelectedProductTitle] = useState<string>("");
-  const [showForm, setShowForm] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
-  const [isLoading, setIsLoading] = useState(false);
-  const [categories, setCategories] = useState<
-    { id: number; titulo: string }[]
-  >([]);
-  const [subcategories, setSubcategories] = useState<
-    { id: number; descripcion: string }[]
-  >([]);
+  const [showForm, setShowForm] = useState<boolean>(false);
+  const [showSuggestionForm, setShowSuggestionForm] = useState<boolean>(false);
+  const [isEditing, setIsEditing] = useState<boolean>(false);
+  const [isInitialLoad, setIsInitialLoad] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [selectedSubcategory, setSelectedSubcategory] = useState<number | null>(
     null
   );
 
+  const roundToOneDecimal = (value: string | number): string => {
+    const num = parseFloat(String(value)) || 0;
+    return (Math.round(num * 10) / 10).toFixed(1);
+  };
+
+  useEffect(() => {
+    if (formValues.precio_sin_oferta) {
+      const precioSinOfertaNum = parseFloat(formValues.precio_sin_oferta);
+      if (!isNaN(precioSinOfertaNum)) {
+        const puntosValue = Math.ceil(precioSinOfertaNum).toString();
+        setFormValues((prev) => ({
+          ...prev,
+          puntos: puntosValue,
+        }));
+      } else {
+        setFormValues((prev) => ({
+          ...prev,
+          puntos: "",
+        }));
+      }
+    } else {
+      setFormValues((prev) => ({
+        ...prev,
+        puntos: "",
+      }));
+    }
+  }, [formValues.precio_sin_oferta]);
+
+  useEffect(() => {
+    const precioSinOferta = parseFloat(formValues.precio_sin_oferta) || 0;
+    const descuento = parseFloat(formValues.porcentaje_descuento) || 0;
+    const descuentoAmount = (precioSinOferta * descuento) / 100;
+    const precioFinal = precioSinOferta - descuentoAmount;
+
+    const roundedPrecioFinal = roundToOneDecimal(precioFinal);
+
+    setFormValues((prev) => ({
+      ...prev,
+      precio: precioFinal > 0 ? roundedPrecioFinal : "0.0",
+    }));
+  }, [formValues.precio_sin_oferta, formValues.porcentaje_descuento]);
+
   useEffect(() => {
     if (!hasFetchedProducts.current) {
       hasFetchedProducts.current = true;
       fetchProducts();
-      fetchProductTypes();
     }
   }, [branchId]);
 
   const fetchProducts = async () => {
     setIsLoading(true);
     try {
-      const products = await getProductsByBranchId(branchId);
-      console.log(products);
+      const products = await getProductsByBranchId(branchId ?? "");
+      console.log(products, "products");
       if (!products || products.length === 0) {
         setData([]);
         setFilteredData([]);
-
         if (isInitialLoad) {
           Swal.fire({
             icon: "info",
@@ -114,9 +184,13 @@ export function ProductsCommerce({
         setIsInitialLoad(false);
         return;
       }
-
-      setData(products);
-      setFilteredData(products);
+      const roundedProducts = products.map((product: RowData) => ({
+        ...product,
+        precio: roundToOneDecimal(product.precio),
+        precio_sin_oferta: roundToOneDecimal(product.precio_sin_oferta),
+      }));
+      setData(roundedProducts);
+      setFilteredData(roundedProducts);
       setIsInitialLoad(false);
     } catch (error) {
       Swal.fire("Error", "Hubo un problema al obtener los productos.", "error");
@@ -125,62 +199,32 @@ export function ProductsCommerce({
     }
   };
 
-  const getSaveButtonClass = () => {
+  const getSaveButtonClass = (): string => {
     return isLoading
       ? "bg-gray-400 text-white cursor-not-allowed"
       : "bg-primary text-gray hover:bg-opacity-90";
-  };
-
-  const fetchProductTypes = async () => {
-    try {
-      const response = await getProductTypeList();
-      if (Array.isArray(response.data)) {
-        setProductTypes(response.data); // Asigna el array contenido en `response.data`
-      } else {
-        console.error(
-          "Error: el formato de tipos no es un array:",
-          response.data
-        );
-        setProductTypes([]); // En caso de error, asigna un array vacío
-      }
-    } catch (error) {
-      Swal.fire(
-        "Error",
-        "Hubo un problema al obtener los tipos de productos.",
-        "error"
-      );
-      console.error("Error al obtener los tipos de productos:", error);
-      setProductTypes([]);
-    }
-  };
-
-  const handleDiscountChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value;
-    setFormValues((prev) => ({
-      ...prev,
-      tiene_descuento: value,
-      porcentaje_descuento: value === "0" ? "0.00" : prev.porcentaje_descuento, // Reinicia el porcentaje si no tiene descuento
-    }));
   };
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
-    setFormValues((prev) => ({ ...prev, [name]: value }));
+
+    // Validar entrada en tiempo real
+    if (name === "precio_sin_oferta") {
+      // Permitir solo números y un punto (.), no comas
+      const sanitizedValue = value.replace(/[^0-9.]/g, "");
+      setFormValues((prev) => ({ ...prev, [name]: sanitizedValue }));
+    } else if (name === "puntos" || name === "porcentaje_descuento") {
+      // Permitir solo números enteros (sin puntos ni comas)
+      const sanitizedValue = value.replace(/[^0-9]/g, "");
+      setFormValues((prev) => ({ ...prev, [name]: sanitizedValue }));
+    } else {
+      setFormValues((prev) => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleEstadoChange = (value: number) => {
-    // Si el producto no tiene cupón (coupon === 0) y está intentando activar (value === 1)
-    if (formValues.coupon === 0 && value === 1) {
-      Swal.fire({
-        icon: "warning",
-        title: "No se puede activar",
-        text: "No se puede activar un producto sin cupón. Por favor, primero registre el producto y despues agregue un cupón.",
-      });
-      return;
-    }
-
     setFormValues((prev) => ({
       ...prev,
       activo: String(value),
@@ -196,18 +240,14 @@ export function ProductsCommerce({
     const fileUrl = URL.createObjectURL(file);
     setImageFiles((prevFiles) => {
       const updatedFiles = [...prevFiles];
-      updatedFiles[index] = { file, url: fileUrl }; // Reemplaza con el archivo nuevo
+      updatedFiles[index] = { file, url: fileUrl };
       return updatedFiles;
     });
   };
 
   useEffect(() => {
-    if (inheritedCategory) {
-      setSelectedCategory(inheritedCategory);
-    }
-    if (inheritedSubcategory) {
-      setSelectedSubcategory(inheritedSubcategory);
-    }
+    if (inheritedCategory) setSelectedCategory(inheritedCategory);
+    if (inheritedSubcategory) setSelectedSubcategory(inheritedSubcategory);
   }, [inheritedCategory, inheritedSubcategory]);
 
   const initializeForm = () => {
@@ -219,40 +259,31 @@ export function ProductsCommerce({
       precio_sin_oferta: "",
       sucursal: branchId || "",
       coupon: 0,
-      activo: "0",
+      activo: "1",
       tipo: "",
       likes: "0",
       rating: "0.00",
       tiene_descuento: "0",
-      porcentaje_descuento: "0.00",
+      porcentaje_descuento: "0",
       fecha_vencimiento: "",
       categories: [],
       subcategories: [],
+      puntos: "",
     });
-    setImageFiles([]);
+    setImageFiles([{ file: null, url: "" }]);
     setIsEditing(false);
     setSelectedProductId(null);
-
-    if (inheritedCategory) {
-      setSelectedCategory(inheritedCategory);
-    }
-    if (inheritedSubcategory) {
-      setSelectedSubcategory(inheritedSubcategory);
-    }
+    if (inheritedCategory) setSelectedCategory(inheritedCategory);
+    if (inheritedSubcategory) setSelectedSubcategory(inheritedSubcategory);
   };
 
-  const handleFilterChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedId = event.target.value;
-    setSelectedType(selectedId);
-
-    if (selectedId) {
-      // Encuentra el nombre correspondiente en `productTypes` usando el ID seleccionado
-      const selectedTypeName = productTypes.find(
-        (type) => type.id === Number(selectedId)
-      )?.nombre;
-
+  const handleFilterChange = (value: number) => {
+    setSelectedType(String(value));
+    if (value) {
+      const selectedTypeName = productTypeOptions.find(
+        (type) => type.id === value
+      )?.text;
       if (selectedTypeName) {
-        // Filtra los productos según el nombre encontrado
         const filtered = data.filter(
           (product) => product.tipo === selectedTypeName
         );
@@ -264,6 +295,10 @@ export function ProductsCommerce({
   };
 
   const validateProductForm = (): boolean => {
+    const roundedPrecioSinOferta = roundToOneDecimal(
+      formValues.precio_sin_oferta
+    );
+
     const titleError = productValidations.validateTitle(formValues.titulo);
     const shortDescError = productValidations.validateShortDescription(
       formValues.descripcion_corta
@@ -271,7 +306,9 @@ export function ProductsCommerce({
     const descError = productValidations.validateDescription(
       formValues.descripcion
     );
-    const priceError = productValidations.validatePrice(formValues.precio);
+    const priceError = productValidations.validatePrice(
+      formValues.precio_sin_oferta
+    );
     const categoryError = productValidations.validateCategory(selectedCategory);
     const subcategoryError = productValidations.validateSubcategory(
       selectedSubcategory,
@@ -286,6 +323,10 @@ export function ProductsCommerce({
       imageFiles,
       isEditing
     );
+    const discountError = productValidations.validateDiscount(
+      formValues.porcentaje_descuento
+    );
+    const pointsError = productValidations.validatePoints(formValues.puntos);
 
     const validationErrors: Record<string, string | undefined> = {
       title: titleError,
@@ -297,17 +338,16 @@ export function ProductsCommerce({
       type: typeError,
       expiration: expirationError,
       image: imageError,
+      discount: discountError,
+      points: pointsError,
     };
 
-    // Filtrar y recolectar errores
     const errors = Object.values(validationErrors).filter(
       (error) => error !== undefined
     );
 
-    // Si hay errores, mostrarlos todos en una lista
     if (errors.length > 0) {
       const errorList = errors.map((error) => `• ${error}`).join("<br>");
-
       Swal.fire({
         icon: "error",
         title: "Errores de validación",
@@ -315,7 +355,10 @@ export function ProductsCommerce({
       });
       return false;
     }
-
+    setFormValues((prev) => ({
+      ...prev,
+      precio_sin_oferta: roundedPrecioSinOferta,
+    }));
     return true;
   };
 
@@ -335,20 +378,19 @@ export function ProductsCommerce({
       formData.append("likes", formValues.likes);
       formData.append("rating", formValues.rating);
       formData.append("tiene_descuento", formValues.tiene_descuento);
-      formData.append(
-        "porcentaje_descuento",
-        formValues.porcentaje_descuento || ""
-      );
+      formData.append("porcentaje_descuento", formValues.porcentaje_descuento);
       formData.append("fecha_vencimiento", formValues.fecha_vencimiento || "");
 
-      // Manejo de imágenes
+      if (formValues.puntos) {
+        formData.append("puntos", formValues.puntos);
+      }
+
       imageFiles.forEach((image, index) => {
         if (image.file) {
           formData.append(`imagen${index + 1}`, image.file);
         }
       });
 
-      // Categorías y subcategorías
       if (selectedCategory) {
         formData.append("categories[]", selectedCategory.toString());
       }
@@ -356,44 +398,23 @@ export function ProductsCommerce({
         formData.append("subcategories[]", selectedSubcategory.toString());
       }
 
-      // Crear o actualizar producto
       if (isEditing && selectedProductId) {
         await updateProduct(selectedProductId, formData);
         Swal.fire(
           "¡Actualizado!",
-          "El producto fue actualizado con éxito.",
+          "El producto y su cupón fueron actualizados con éxito.",
           "success"
         );
       } else {
-        const productResponse = await createProduct(formData);
-        setIsLoading(false);
-
-        // Mostrar mensaje de éxito con opción de crear cupón
-        const result = await Swal.fire({
-          icon: "success",
-          title: "¡Producto creado con éxito!",
-          text: "¿Deseas crear un cupón para este producto?",
-          showCancelButton: true,
-          confirmButtonText: "Sí, crear cupón",
-          cancelButtonText: "No, terminar",
-          confirmButtonColor: "#3085d6",
-          cancelButtonColor: "#d33",
-        });
-
-        if (result.isConfirmed) {
-          setSelectedProductId(productResponse.data.id);
-          setSelectedProductTitle(productResponse.data.titulo);
-          setIsCouponView(true);
-        } else {
-          setShowForm(false);
-          await fetchProducts();
-        }
+        await createProduct(formData);
+        Swal.fire(
+          "¡Producto creado!",
+          "El producto y su cupón fueron creados con éxito.",
+          "success"
+        );
       }
 
-      // Recargar la lista de productos
       await fetchProducts();
-
-      // Cerrar el formulario
       setShowForm(false);
     } catch (error) {
       Swal.fire({
@@ -402,6 +423,73 @@ export function ProductsCommerce({
         text: "Hubo un problema al guardar el producto.",
       });
       console.error("Error al guardar o actualizar el producto:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGenerateSuggestions = async () => {
+    if (!formValues.titulo) {
+      Swal.fire({
+        icon: "warning",
+        title: "Falta el título",
+        text: "Por favor, ingresa un título para generar sugerencias.",
+      });
+      return;
+    }
+    if (!imageFiles[0]?.file) {
+      Swal.fire({
+        icon: "warning",
+        title: "Falta la imagen",
+        text: "Por favor, sube una imagen para generar sugerencias.",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const suggestions = await generateSuggestions(
+        formValues.titulo,
+        imageFiles[0].file
+      );
+      const { data } = suggestions;
+
+      const tipoMap: { [key: string]: string } = {
+        "Tipo 1": "1", // Standard
+        "Tipo 3": "3", // Flash
+      };
+
+      const tipoValue = tipoMap[data.tipo] || formValues.tipo;
+
+      setFormValues((prev) => ({
+        ...prev,
+        descripcion_corta: data.descripcion_corta || prev.descripcion_corta,
+        descripcion: data.descripcion_completa || prev.descripcion,
+        precio_sin_oferta:
+          roundToOneDecimal(data.precio.replace("S/ ", "")) ||
+          prev.precio_sin_oferta,
+        tipo: tipoValue,
+        porcentaje_descuento:
+          data.descuento.replace("%", "") || prev.porcentaje_descuento,
+        tiene_descuento: data.descuento ? "1" : prev.tiene_descuento,
+        fecha_vencimiento: data.fecha_expiracion || prev.fecha_vencimiento,
+      }));
+
+      setShowSuggestionForm(false);
+      setShowForm(true);
+
+      Swal.fire({
+        icon: "success",
+        title: "Sugerencias generadas",
+        text: "Las sugerencias se han aplicado al formulario.",
+      });
+    } catch (error) {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "No se pudieron generar las sugerencias. Intenta de nuevo.",
+      });
+      console.error("Error al generar sugerencias:", error);
     } finally {
       setIsLoading(false);
     }
@@ -445,44 +533,41 @@ export function ProductsCommerce({
   const onEdit = async (row: RowData) => {
     try {
       const response = await showProduct(row.id);
-      const product = response.data;
+      const product = response.data.product;
+      const coupon = response.data.coupon;
 
-      console.log("Datos del producto:", product);
-
-      // Primero establecemos solo el ID de la categoría
       if (product.categories && product.categories.length > 0) {
-        const categoryId = product.categories[0].id; // Extraemos el ID
+        const categoryId = product.categories[0].id;
         setSelectedCategory(categoryId);
-
-        // Guardamos el ID de la subcategoría
         const subcategoryId =
           product.subcategories && product.subcategories.length > 0
-            ? product.subcategories[0].id // Extraemos el ID
+            ? product.subcategories[0].id
             : null;
-
-        // Esperamos a que se carguen las subcategorías
         if (subcategoryId) {
-          setTimeout(() => {
-            setSelectedSubcategory(subcategoryId);
-          }, 500);
+          setTimeout(() => setSelectedSubcategory(subcategoryId), 500);
         }
       }
+
+      const precioSinOfertaValue =
+        roundToOneDecimal(product.precio_sin_oferta) || "0.0";
+      const puntosValue =
+        coupon?.puntos?.toString() ||
+        Math.ceil(parseFloat(precioSinOfertaValue)).toString();
 
       setFormValues({
         titulo: product.titulo || "",
         descripcion_corta: product.descripcion_corta || "",
         descripcion: product.descripcion || "",
-        precio: product.precio?.toString() || "",
-        precio_sin_oferta: product.precio_sin_oferta?.toString() || "",
+        precio: roundToOneDecimal(product.precio) || "0.0",
+        precio_sin_oferta: precioSinOfertaValue,
         sucursal: product.branch_id?.toString() || branchId || "",
-        coupon: product.coupon,
+        coupon: coupon ? 1 : 0,
         tipo: product.tipo?.toString() || "",
-        activo: product.activo?.toString() || "0",
+        activo: product.activo?.toString() || "1",
         likes: product.likes?.toString() || "0",
         rating: product.rating?.toString() || "0.00",
         tiene_descuento: product.tiene_descuento?.toString() || "0",
-        porcentaje_descuento:
-          product.porcentaje_descuento?.toString() || "0.00",
+        porcentaje_descuento: coupon?.porcentaje_descuento?.toString() || "0",
         fecha_vencimiento: product.fecha_vencimiento || "",
         categories: product.categories
           ? product.categories.map((cat: any) => cat.id)
@@ -490,9 +575,9 @@ export function ProductsCommerce({
         subcategories: product.subcategories
           ? product.subcategories.map((sub: any) => sub.id)
           : [],
+        puntos: puntosValue,
       });
 
-      // Cargar imágenes existentes en el estado
       setImageFiles([
         product.imagen1
           ? { file: null, url: product.imagen1 }
@@ -508,10 +593,6 @@ export function ProductsCommerce({
       setSelectedProductId(product.id);
       setIsEditing(true);
       setShowForm(true);
-
-      // Para debug
-      console.log("Categoría seleccionada:", product.categories[0]);
-      console.log("Subcategoría seleccionada:", product.subcategories[0]);
     } catch (error) {
       Swal.fire("Error", "Error al obtener los datos del producto", "error");
       console.error("Error al obtener los datos del producto:", error);
@@ -523,23 +604,6 @@ export function ProductsCommerce({
       Header: "Acciones",
       Cell: (row: RowData) => (
         <div className="flex space-x-2">
-          {/* Botón de Ver Cupones */}
-          <button
-            className="relative pl-1 bg-green-500 text-slate-50 flex items-center rounded-lg group overflow-hidden transition-all duration-500 ease-in-out w-[2rem] hover:w-[7rem]"
-            onClick={() => onViewCoupons(row)}
-          >
-            <Icon
-              icon="mdi:coupon-outline"
-              className="flex-shrink-0"
-              width="25"
-              height="24"
-            />
-            <span className="ml-0 opacity-0 translate-x-[-10px] group-hover:opacity-100 group-hover:translate-x-0 group-hover:ml-2 transition-all duration-500 ease-in-out delay-100">
-              Cupones
-            </span>
-          </button>
-
-          {/* Botón de Editar */}
           <button
             className="relative p-2 bg-blue-500 text-slate-50 flex items-center rounded-lg group overflow-hidden transition-all duration-500 ease-in-out w-[2rem] hover:w-[5rem]"
             onClick={() => onEdit(row)}
@@ -549,8 +613,6 @@ export function ProductsCommerce({
               Editar
             </span>
           </button>
-
-          {/* Botón de Eliminar */}
           <button
             className="relative p-2 bg-red-500 text-slate-50 flex items-center rounded-lg group overflow-hidden transition-all duration-500 ease-in-out w-[2rem] hover:w-[6rem]"
             onClick={() => onDelete(row)}
@@ -564,31 +626,20 @@ export function ProductsCommerce({
       ),
     },
     { Header: "Título", accessor: "titulo" as keyof RowData },
-    { Header: "Precio", accessor: "precio" as keyof RowData },
+    {
+      Header: "Precio",
+      accessor: "precio" as keyof RowData,
+      Cell: (row: RowData) => row.precio,
+    },
     {
       Header: "Tipo",
       accessor: "tipo" as keyof RowData,
       Cell: (row: RowData) => {
-        const productType = productTypes.find(
-          (type) => type.nombre === row.tipo // Compara el nombre con el tipo
+        const productType = productTypeOptions.find(
+          (type) => type.text === row.tipo
         );
-        return productType ? productType.nombre : "Desconocido";
+        return <span>{productType ? productType.text : "Desconocido"}</span>;
       },
-    },
-    {
-      Header: "Cupón",
-      accessor: "coupon" as keyof RowData,
-      Cell: (row: RowData) => (
-        <span
-          className={`px-2 py-1 rounded text-white ${
-            row.coupon === 1
-              ? "bg-green-500 text-white"
-              : "bg-red-500 text-white"
-          }`}
-        >
-          {row.coupon === 1 ? "Con cupón" : "Sin cupón"}
-        </span>
-      ),
     },
     {
       Header: "Estado",
@@ -606,18 +657,6 @@ export function ProductsCommerce({
       ),
     },
   ];
-
-  const onViewCoupons = (row: RowData) => {
-    console.log("ID del producto seleccionado:", row.id); // Log del ID del producto
-    setSelectedProductId(row.id); // ID del producto seleccionado
-    setSelectedProductTitle(row.titulo); // Título del producto seleccionado
-    setIsCouponView(true); // Cambia a la vista de cupones
-  };
-
-  const handleBackToProducts = () => {
-    setIsCouponView(false); // Cambia a la vista de productos
-    fetchProducts(); // Recarga los productos
-  };
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -650,151 +689,208 @@ export function ProductsCommerce({
     fetchSubcategories();
   }, [selectedCategory]);
 
-  const estadoCupon = [
+  const estadoCupon: EstadoCuponOption[] = [
     { id: 0, text: "Inactivo" },
     { id: 1, text: "Activo" },
   ];
 
+  const productTypeOptions: ProductTypeOption[] = [
+    { id: 1, text: "Standard" },
+    { id: 3, text: "Flash" },
+    { id: 4, text: "Destacados" },
+  ];
+
+  const handleOpenSuggestionForm = () => {
+    initializeForm();
+    setShowSuggestionForm(true);
+  };
+
   return (
     <>
-      {isCouponView ? (
-        <CouponsCommerce
-          productId={selectedProductId}
-          productTitle={selectedProductTitle}
-          onBackClick={handleBackToProducts}
-        />
-      ) : (
-        <>
-          {showForm ? (
-            <div className="shadow-xl p-8 rounded-lg container mx-auto bg-white-translucent dark:bg-boxdark">
-              <div className="w-full flex gap-4 mb-8 items-start ">
-                <i
-                  className="fas mt-1 fa-chevron-left text-white bg-[#1c2434] p-2 rounded-full flex items-center justify-center w-8 h-8 cursor-pointer"
-                  onClick={() => setShowForm(false)}
-                ></i>
-                <div className="flex flex-col">
-                  <label className="text-title-md2 font-semibold text-black dark:text-white">
-                    {isEditing
-                      ? `Editar Producto de: ${selectedBranchName}`
-                      : `Agregar Producto a: ${selectedBranchName}`}
-                  </label>
-                  <p>{branchAddress}</p>
-                </div>
+      <>
+        {showSuggestionForm ? (
+          <div className="shadow-xl p-8 rounded-lg container mx-auto bg-white-translucent dark:bg-boxdark">
+            <div className="w-full flex gap-4 mb-8 items-start">
+              <i
+                className="fas mt-1 fa-chevron-left text-white bg-[#1c2434] p-2 rounded-full flex items-center justify-center w-8 h-8 cursor-pointer"
+                onClick={() => setShowSuggestionForm(false)}
+              ></i>
+              <div className="flex flex-col">
+                <label className="text-title-md2 font-semibold text-black dark:text-white">
+                  Generar Producto con IA para: {selectedBranchName}
+                </label>
+                <p>{branchAddress}</p>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <label>
-                  Título *
-                  <input
-                    type="text"
-                    name="titulo"
-                    value={formValues.titulo}
-                    onChange={handleInputChange}
-                    className="w-full rounded border border-stroke py-3 pl-3.5 pr-4.5 dark:bg-boxdark dark:border-strokedark dark:text-white"
-                  />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <label>
+                Título *
+                <input
+                  type="text"
+                  name="titulo"
+                  value={formValues.titulo}
+                  onChange={handleInputChange}
+                  className="w-full rounded border border-stroke py-3 pl-3.5 pr-4.5 dark:bg-boxdark dark:border-strokedark dark:text-white"
+                />
+              </label>
+              <label>
+                Imagen *
+                <Uploader
+                  onFileSelect={(file: File) => handleImageUpload(file, 0)}
+                  accept="image/jpeg, image/jpg, image/png"
+                  maxSize={100 * 1024 * 1024}
+                  label="Imagen 1"
+                  className="w-full rounded border border-stroke py-3 px-4 text-black dark:text-white dark:border-strokedark dark:bg-boxdark focus:border-primary"
+                  initialPreview={imageFiles[0]?.url || ""}
+                />
+              </label>
+            </div>
+            <div className="mt-4 flex justify-end gap-4.5">
+              <button
+                className="text-[#3c50e0] border-[#3c50e0] rounded border py-2 px-6 font-medium"
+                onClick={() => setShowSuggestionForm(false)}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleGenerateSuggestions}
+                className={`rounded py-2 px-6 font-medium ${
+                  isLoading
+                    ? "bg-gray-400 text-white cursor-not-allowed"
+                    : "bg-yellow-500 text-white hover:bg-opacity-90"
+                }`}
+                disabled={isLoading}
+                aria-label="Generar sugerencias con IA"
+              >
+                {isLoading ? <LoadingDots /> : "Generar Sugerencias"}
+              </button>
+            </div>
+          </div>
+        ) : showForm ? (
+          <div className="shadow-xl p-8 rounded-lg container mx-auto bg-white-translucent dark:bg-boxdark">
+            <div className="w-full flex gap-4 mb-8 items-start">
+              <i
+                className="fas mt-1 fa-chevron-left text-white bg-[#1c2434] p-2 rounded-full flex items-center justify-center w-8 h-8 cursor-pointer"
+                onClick={() => setShowForm(false)}
+              ></i>
+              <div className="flex flex-col">
+                <label className="text-title-md2 font-semibold text-black dark:text-white">
+                  {isEditing
+                    ? `Editar Producto de: ${selectedBranchName}`
+                    : `Agregar Producto a: ${selectedBranchName}`}
                 </label>
-                <label>
-                  Descripción Corta *
-                  <input
-                    type="text"
-                    name="descripcion_corta"
-                    value={formValues.descripcion_corta}
-                    onChange={handleInputChange}
-                    className="w-full rounded border border-stroke py-3 pl-3.5 pr-4.5 dark:bg-boxdark dark:border-strokedark dark:text-white"
-                  />
-                </label>
-                <label className="md:col-span-2">
-                  Descripción *
-                  <textarea
-                    name="descripcion"
-                    value={formValues.descripcion}
-                    onChange={handleTextAreaChange}
-                    className="w-full rounded border border-stroke py-3 pl-3.5 pr-4.5 dark:bg-boxdark dark:border-strokedark dark:text-white"
-                    rows={4}
-                  />
-                </label>
-                <label>
-                  Precio *
-                  <input
-                    type="number"
-                    name="precio"
-                    value={formValues.precio}
-                    onChange={handleInputChange}
-                    className="w-full rounded border border-stroke py-3 pl-3.5 pr-4.5 dark:bg-boxdark dark:border-strokedark dark:text-white"
-                  />
-                </label>
-                <div className="w-full flex gap-4">
-                  {/* Selector de Categorías */}
+                <p>{branchAddress}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="col-span-2">
+                <h3 className="text-lg font-semibold text-black dark:text-white mb-4">
+                  Detalles del Producto
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <label>
-                    Categoría:
-                    <select
-                      value={selectedCategory || ""}
+                    Título *
+                    <input
+                      type="text"
+                      name="titulo"
+                      value={formValues.titulo}
+                      onChange={handleInputChange}
                       className="w-full rounded border border-stroke py-3 pl-3.5 pr-4.5 dark:bg-boxdark dark:border-strokedark dark:text-white"
-                      onChange={(e) =>
-                        setSelectedCategory(parseInt(e.target.value))
-                      }
-                    >
-                      <option value="">Seleccionar categoría</option>
-                      {categories.map((category) => (
-                        <option key={category.id} value={category.id}>
-                          {category.titulo}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </label>
-
-                  {/* Selector de Subcategorías */}
                   <label>
-                    Subcategoría:
-                    <select
-                      value={selectedSubcategory || ""}
-                      className={`w-full rounded border border-stroke py-3 pl-3.5 pr-4.5 dark:bg-boxdark dark:border-strokedark dark:text-white ${
-                        selectedCategory ? "text-black" : "text-gray-400"
-                      }`}
-                      onChange={(e) =>
-                        setSelectedSubcategory(parseInt(e.target.value))
-                      }
-                      disabled={!selectedCategory} // Deshabilitado si no hay categoría seleccionada
-                    >
-                      <option value="">Seleccionar subcategoría</option>
-                      {subcategories.map((subcategory) => (
-                        <option key={subcategory.id} value={subcategory.id}>
-                          {subcategory.descripcion}
-                        </option>
-                      ))}
-                    </select>
+                    Descripción Corta *
+                    <input
+                      type="text"
+                      name="descripcion_corta"
+                      value={formValues.descripcion_corta}
+                      onChange={handleInputChange}
+                      className="w-full rounded border border-stroke py-3 pl-3.5 pr-4.5 dark:bg-boxdark dark:border-strokedark dark:text-white"
+                    />
                   </label>
-                </div>
-                {/* Quitar */}
-                <label className="hidden">
-                  Precio Sin Oferta
-                  <input
-                    type="number"
-                    name="precio_sin_oferta"
-                    value={formValues.precio_sin_oferta}
-                    onChange={handleInputChange}
-                    className="w-full rounded border border-stroke py-3 pl-3.5 pr-4.5 dark:bg-boxdark dark:border-strokedark dark:text-white"
-                  />
-                </label>
-                <label>
-                  Tipo *
-                  <select
-                    name="tipo"
-                    value={formValues.tipo}
-                    onChange={handleInputChange}
-                    className="w-full rounded border border-stroke py-3 pl-3.5 pr-4.5 dark:bg-boxdark dark:border-strokedark dark:text-white"
-                  >
-                    <option value="">Seleccione un tipo</option>
-                    {productTypes.map((type: any) => (
-                      <option key={type.id} value={type.id}>
-                        {type.nombre}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label>
-                  Estado *
-                  <div className="relative">
+                  <label className="md:col-span-2">
+                    Descripción *
+                    <textarea
+                      name="descripcion"
+                      value={formValues.descripcion}
+                      onChange={handleTextAreaChange}
+                      className="w-full rounded border border-stroke py-3 pl-3.5 pr-4.5 dark:bg-boxdark dark:border-strokedark dark:text-white"
+                      rows={4}
+                    />
+                  </label>
+                  <label>
+                    Tipo *
+                    <CustomDropdown
+                      options={productTypeOptions}
+                      value={formValues.tipo ? Number(formValues.tipo) : null}
+                      onChange={(value: number) =>
+                        setFormValues((prev) => ({
+                          ...prev,
+                          tipo: String(value),
+                        }))
+                      }
+                      placeholder="Seleccione un tipo"
+                      className="w-full rounded border border-stroke py-3 pl-3.5 pr-4.5 dark:bg-boxdark dark:border-strokedark dark:text-white"
+                    />
+                  </label>
+                  <div className="w-full flex gap-4">
+                    <label>
+                      Categoría:
+                      <select
+                        value={selectedCategory || ""}
+                        className="w-full rounded border border-stroke py-3 pl-3.5 pr-4.5 dark:bg-boxdark dark:border-strokedark dark:text-white"
+                        onChange={(e) =>
+                          setSelectedCategory(
+                            e.target.value ? parseInt(e.target.value) : null
+                          )
+                        }
+                      >
+                        <option value="">Seleccionar categoría</option>
+                        {categories.map((category) => (
+                          <option key={category.id} value={category.id}>
+                            {category.titulo}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Subcategoría:
+                      <select
+                        value={selectedSubcategory || ""}
+                        className={`w-full rounded border border-stroke py-3 pl-3.5 pr-4.5 dark:bg-boxdark dark:border-strokedark dark:text-white ${
+                          selectedCategory ? "text-black" : "text-gray-400"
+                        }`}
+                        onChange={(e) =>
+                          setSelectedSubcategory(
+                            e.target.value ? parseInt(e.target.value) : null
+                          )
+                        }
+                        disabled={!selectedCategory}
+                      >
+                        <option value="">Seleccionar subcategoría</option>
+                        {subcategories.map((subcategory) => (
+                          <option key={subcategory.id} value={subcategory.id}>
+                            {subcategory.descripcion}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                  {formValues.tipo === "2" || formValues.tipo === "3" ? (
+                    <label>
+                      Fecha de Vencimiento:
+                      <input
+                        type="date"
+                        name="fecha_vencimiento"
+                        value={formValues.fecha_vencimiento}
+                        onChange={handleInputChange}
+                        className="w-full rounded border border-stroke py-3 pl-3.5 pr-4.5 dark:bg-boxdark dark:border-strokedark dark:text-white"
+                      />
+                    </label>
+                  ) : null}
+                  <label>
+                    Estado *
                     <CustomDropdown
                       options={estadoCupon}
                       value={Number(formValues.activo)}
@@ -802,153 +898,139 @@ export function ProductsCommerce({
                       placeholder="Seleccione estado"
                       className="w-full rounded border border-stroke py-3 pl-3.5 pr-4.5 dark:bg-boxdark dark:border-strokedark dark:text-white"
                     />
-                    {formValues.coupon === 0 && (
-                      <Tooltip
-                        id="estadoTooltip"
-                        content="Necesita tener un cupón para activar el producto"
-                        place="top"
-                        className="bg-black dark:bg-boxdark text-white"
-                      />
-                    )}
-                  </div>
-                </label>
-                <label className="hidden">
-                  Likes
-                  <input
-                    type="number"
-                    name="likes"
-                    value={formValues.likes}
-                    onChange={handleInputChange}
-                    className="w-full rounded border border-stroke py-3 pl-3.5 pr-4.5 dark:bg-boxdark dark:border-strokedark dark:text-white"
-                  />
-                </label>
-                <label className="hidden">
-                  Rating
-                  <input
-                    type="number"
-                    name="rating"
-                    step="0.01"
-                    value={formValues.rating}
-                    onChange={handleInputChange}
-                    className="w-full rounded border border-stroke py-3 pl-3.5 pr-4.5 dark:bg-boxdark dark:border-strokedark dark:text-white"
-                  />
-                </label>
-                <label className="hidden">
-                  Tiene Descuento
-                  <select
-                    name="tiene_descuento"
-                    value={formValues.tiene_descuento}
-                    onChange={handleDiscountChange}
-                    className="w-full rounded border border-stroke py-3 pl-3.5 pr-4.5 dark:bg-boxdark dark:border-strokedark dark:text-white"
-                  >
-                    <option value="1">Sí</option>
-                    <option value="0">No</option>
-                  </select>
-                </label>
-                <label className="hidden">
-                  Porcentaje de Descuento
-                  <input
-                    type="number"
-                    name="porcentaje_descuento"
-                    step="0.01"
-                    value={formValues.porcentaje_descuento}
-                    onChange={handleInputChange}
-                    className="w-full rounded border border-stroke py-3 pl-3.5 pr-4.5 dark:bg-boxdark dark:border-strokedark dark:text-white"
-                    disabled={formValues.tiene_descuento === "0"} // Desactiva si "No"
-                  />
-                </label>
-                {formValues.tipo === "3" || formValues.tipo === "2" ? (
+                  </label>
                   <label>
-                    Fecha de Vencimiento:
+                    Precio Inicial *
                     <input
-                      type="date"
-                      name="fecha_vencimiento"
-                      value={formValues.fecha_vencimiento}
+                      type="text"
+                      name="precio_sin_oferta"
+                      value={formValues.precio_sin_oferta}
                       onChange={handleInputChange}
                       className="w-full rounded border border-stroke py-3 pl-3.5 pr-4.5 dark:bg-boxdark dark:border-strokedark dark:text-white"
+                      placeholder="Ejemplo: 15.9"
                     />
                   </label>
-                ) : null}
+                </div>
+              </div>
 
+              <div className="col-span-2 mt-6">
+                <h3 className="text-lg font-semibold text-black dark:text-white mb-4">
+                  Detalles del Cupón
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <label>
+                    Porcentaje de Descuento del Cupón *
+                    <input
+                      type="text"
+                      name="porcentaje_descuento"
+                      value={formValues.porcentaje_descuento}
+                      onChange={handleInputChange}
+                      className="w-full rounded border border-stroke py-3 pl-3.5 pr-4.5 dark:bg-boxdark dark:border-strokedark dark:text-white"
+                      min="0"
+                      max="100"
+                      placeholder="Ejemplo: 10"
+                    />
+                  </label>
+                  <label>
+                    Precio final (calculado)
+                    <input
+                      type="number"
+                      name="precio"
+                      value={formValues.precio}
+                      className="w-full rounded border border-stroke py-3 pl-3.5 pr-4.5 dark:bg-boxdark dark:border-strokedark dark:text-white bg-gray-100 cursor-not-allowed"
+                      disabled
+                    />
+                  </label>
+                  <label>
+                    Puntos (opcional)
+                    <input
+                      type="text"
+                      name="puntos"
+                      value={formValues.puntos}
+                      onChange={handleInputChange}
+                      className="w-full rounded border border-stroke py-3 pl-3.5 pr-4.5 dark:bg-boxdark dark:border-strokedark dark:text-white"
+                      placeholder="Se calcula automáticamente según el precio"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="col-span-2 mt-6">
+                <h3 className="text-lg font-semibold text-black dark:text-white mb-4">
+                  Imagen del Producto
+                </h3>
                 <label className="md:col-span-2">
-                  Imágenes
+                  Imagen
                   <div className="flex flex-col md:flex-row gap-4 mt-2">
-                    {Array.from({ length: 1 }).map((_, index) => (
-                      <div
-                        key={index}
-                        className="w-full md:w-1/2 flex flex-col items-center"
-                      >
-                        <Uploader
-                          onFileSelect={(file) =>
-                            handleImageUpload(file, index)
-                          }
-                          accept="image/jpeg, image/jpg, image/png"
-                          maxSize={10 * 1024 * 1024}
-                          label={`Imagen ${index + 1}`}
-                          className="w-full rounded border border-stroke py-3 px-4 text-black dark:text-white dark:border-strokedark dark:bg-boxdark focus:border-primary"
-                          initialPreview={imageFiles[index]?.url || ""} // Mostrar la imagen existente
-                        />
-                      </div>
-                    ))}
+                    <Uploader
+                      onFileSelect={(file: File) => handleImageUpload(file, 0)}
+                      accept="image/jpeg, image/jpg, image/png"
+                      maxSize={100 * 1024 * 1024}
+                      label="Imagen 1"
+                      className="w-full rounded border border-stroke py-3 px-4 text-black dark:text-white dark:border-strokedark dark:bg-boxdark focus:border-primary"
+                      initialPreview={imageFiles[0]?.url || ""}
+                    />
                   </div>
                 </label>
               </div>
-              <div className="mt-4 flex justify-end gap-4.5">
-                <button
-                  className="text-[#3c50e0] border-[#3c50e0] rounded border py-2 px-6 font-medium"
-                  onClick={() => setShowForm(false)}
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={saveOrUpdateProduct}
-                  className={`rounded py-2 px-6 font-medium ${getSaveButtonClass()}`}
-                  disabled={isLoading}
-                  aria-label={
-                    isEditing ? "Actualizar producto" : "Guardar producto"
-                  }
-                >
-                  {isLoading ? (
-                    <LoadingDots />
-                  ) : isEditing ? (
-                    "Actualizar"
-                  ) : (
-                    "Guardar"
-                  )}
-                </button>
-              </div>
             </div>
-          ) : (
-            <TablaItem
-              data={filteredData}
-              columns={columns}
-              title={`Productos de ${selectedBranchName}`}
-              branchAddress={branchAddress}
-              buttonLabel="Agregar Producto"
-              onButtonClick={() => {
-                initializeForm();
-                setShowForm(true);
-              }}
-              showBackButton={true}
-              onBackClick={onBackClick}
-              extraControls={
-                <select
-                  value={selectedType}
-                  onChange={handleFilterChange}
-                  className=" h-auto px-2 rounded border border-stroke dark:bg-boxdark dark:border-strokedark dark:text-white"
-                >
-                  <option value="">Todos los Tipos</option>
-                  {productTypes.map((type: any) => (
-                    <option key={type.id} value={type.id}>
-                      {type.nombre}
-                    </option>
-                  ))}
-                </select>
-              }
-            />
-          )}
-        </>
-      )}
+
+            <div className="mt-6 flex justify-end gap-4.5">
+              <button
+                className="text-[#3c50e0] border-[#3c50e0] rounded border py-2 px-6 font-medium"
+                onClick={() => setShowForm(false)}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={saveOrUpdateProduct}
+                className={`rounded py-2 px-6 font-medium ${getSaveButtonClass()}`}
+                disabled={isLoading}
+                aria-label={
+                  isEditing ? "Actualizar producto" : "Guardar producto"
+                }
+              >
+                {isLoading ? (
+                  <LoadingDots />
+                ) : isEditing ? (
+                  "Actualizar"
+                ) : (
+                  "Guardar"
+                )}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <TablaItem
+            data={filteredData}
+            columns={columns}
+            title={`Productos de ${selectedBranchName}`}
+            branchAddress={branchAddress}
+            buttonLabel="Agregar Producto"
+            onButtonClick={() => {
+              initializeForm();
+              setShowForm(true);
+            }}
+            showBackButton={true}
+            showNewButton={true}
+            newButtonLabel="Generar Producto con IA"
+            onNewButtonClick={handleOpenSuggestionForm}
+            onBackClick={onBackClick}
+            extraControls={
+              <CustomDropdown
+                options={[
+                  { id: 0, text: "Todos los Tipos" },
+                  ...productTypeOptions,
+                ]}
+                value={selectedType ? Number(selectedType) : null}
+                onChange={handleFilterChange}
+                placeholder="Filtrar por tipo"
+                className="h-auto px-2 rounded border border-stroke dark:bg-boxdark dark:border-strokedark dark:text-white"
+              />
+            }
+          />
+        )}
+      </>
     </>
   );
 }

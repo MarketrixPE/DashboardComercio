@@ -1,30 +1,54 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import ClickOutside from '../../Atoms/ClickOutside';
+import { useNotifications } from '../../../hooks/useNotifications';
+import NotificationItem from '../../Atoms/NotificationItem/NotificationItem';
+
 
 const DropdownNotification = () => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [notifying, setNotifying] = useState(true);
+  const {
+    notifications,
+    loading,
+    unreadCount,
+    markAsRead,
+    markAllAsRead,
+    removeNotification,
+    clearAllNotifications,
+    refreshNotifications
+  } = useNotifications();
+
+  const handleNotificationClick = (notificationId: string) => {
+    markAsRead(notificationId);
+  };
+
+  const handleRefresh = () => {
+    refreshNotifications();
+  };
 
   return (
     <ClickOutside onClick={() => setDropdownOpen(false)} className="relative">
       <li>
         <Link
           onClick={() => {
-            setNotifying(false);
             setDropdownOpen(!dropdownOpen);
           }}
           to="#"
           className="relative flex h-8.5 w-8.5 items-center justify-center rounded-full border-[0.5px] border-stroke bg-gray hover:text-primary dark:border-strokedark dark:bg-meta-4 dark:text-white"
         >
-          <span
-            className={`absolute -top-0.5 right-0 z-1 h-2 w-2 rounded-full bg-meta-1 ${
-              notifying === false ? 'hidden' : 'inline'
-            }`}
-          >
-            <span className="absolute -z-1 inline-flex h-full w-full animate-ping rounded-full bg-meta-1 opacity-75"></span>
-          </span>
+          {/* Badge de notificaciones */}
+          {unreadCount > 0 && (
+            <span className="absolute -top-0.5 right-0 z-1 h-2 w-2 rounded-full bg-meta-1">
+              <span className="absolute -z-1 inline-flex h-full w-full animate-ping rounded-full bg-meta-1 opacity-75"></span>
+              {unreadCount > 9 && (
+                <span className="absolute -top-1 -right-1 z-2 min-w-4 h-4 flex items-center justify-center text-xs font-bold text-white bg-red-500 rounded-full px-1">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </span>
+          )}
 
+          {/* Icono de campana */}
           <svg
             className="fill-current duration-300 ease-in-out"
             width="18"
@@ -41,80 +65,98 @@ const DropdownNotification = () => {
         </Link>
 
         {dropdownOpen && (
-          <div
-            className={`absolute -right-27 mt-2.5 flex h-90 w-75 flex-col rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark sm:right-0 sm:w-80`}
-          >
-            <div className="px-4.5 py-3">
-              <h5 className="text-sm font-medium text-bodydark2">
-                Notification
-              </h5>
+          <div className="absolute -right-27 mt-2.5 flex h-90 w-75 flex-col rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark sm:right-0 sm:w-80">
+            {/* Header de notificaciones */}
+            <div className="px-4.5 py-3 border-b border-stroke dark:border-strokedark">
+              <div className="flex items-center justify-between">
+                <h5 className="text-sm font-medium text-bodydark2">
+                  Notificaciones
+                  {unreadCount > 0 && (
+                    <span className="ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-500 rounded-full">
+                      {unreadCount}
+                    </span>
+                  )}
+                </h5>
+                <div className="flex items-center gap-2">
+                  {/* Botón refrescar */}
+                  <button
+                    onClick={handleRefresh}
+                    disabled={loading}
+                    className="text-gray-500 hover:text-primary disabled:opacity-50"
+                    title="Refrescar notificaciones"
+                  >
+                    <svg
+                      className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                      />
+                    </svg>
+                  </button>
+                  
+                  {/* Botón marcar todas como leídas */}
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={markAllAsRead}
+                      className="text-xs text-primary hover:underline"
+                      title="Marcar todas como leídas"
+                    >
+                      Marcar todas
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
 
-            <ul className="flex h-auto flex-col overflow-y-auto">
-              <li>
-                <Link
-                  className="flex flex-col gap-2.5 border-t border-stroke px-4.5 py-3 hover:bg-gray-2 dark:border-strokedark dark:hover:bg-meta-4"
-                  to="#"
-                >
-                  <p className="text-sm">
-                    <span className="text-black dark:text-white">
-                      Edit your information in a swipe
-                    </span>{' '}
-                    Sint occaecat cupidatat non proident, sunt in culpa qui
-                    officia deserunt mollit anim.
-                  </p>
+            {/* Lista de notificaciones */}
+            <ul className="flex h-auto flex-col overflow-y-auto max-h-64">
+              {loading && (
+                <li className="px-4.5 py-3 text-center text-sm text-gray-500">
+                  Cargando notificaciones...
+                </li>
+              )}
+              
+              {!loading && notifications.length === 0 && (
+                <li className="px-4.5 py-3 text-center text-sm text-gray-500">
+                  No hay notificaciones
+                </li>
+              )}
 
-                  <p className="text-xs">12 May, 2025</p>
-                </Link>
-              </li>
-              <li>
-                <Link
-                  className="flex flex-col gap-2.5 border-t border-stroke px-4.5 py-3 hover:bg-gray-2 dark:border-strokedark dark:hover:bg-meta-4"
-                  to="#"
-                >
-                  <p className="text-sm">
-                    <span className="text-black dark:text-white">
-                      It is a long established fact
-                    </span>{' '}
-                    that a reader will be distracted by the readable.
-                  </p>
-
-                  <p className="text-xs">24 Feb, 2025</p>
-                </Link>
-              </li>
-              <li>
-                <Link
-                  className="flex flex-col gap-2.5 border-t border-stroke px-4.5 py-3 hover:bg-gray-2 dark:border-strokedark dark:hover:bg-meta-4"
-                  to="#"
-                >
-                  <p className="text-sm">
-                    <span className="text-black dark:text-white">
-                      There are many variations
-                    </span>{' '}
-                    of passages of Lorem Ipsum available, but the majority have
-                    suffered
-                  </p>
-
-                  <p className="text-xs">04 Jan, 2025</p>
-                </Link>
-              </li>
-              <li>
-                <Link
-                  className="flex flex-col gap-2.5 border-t border-stroke px-4.5 py-3 hover:bg-gray-2 dark:border-strokedark dark:hover:bg-meta-4"
-                  to="#"
-                >
-                  <p className="text-sm">
-                    <span className="text-black dark:text-white">
-                      There are many variations
-                    </span>{' '}
-                    of passages of Lorem Ipsum available, but the majority have
-                    suffered
-                  </p>
-
-                  <p className="text-xs">01 Dec, 2024</p>
-                </Link>
-              </li>
+              {!loading && notifications.map((notification) => (
+                <NotificationItem
+                  key={notification.id}
+                  notification={notification}
+                  onNotificationClick={handleNotificationClick}
+                  onRemoveNotification={removeNotification}
+                />
+              ))}
             </ul>
+
+            {/* Footer con acciones */}
+            {notifications.length > 0 && (
+              <div className="border-t border-stroke dark:border-strokedark px-4.5 py-3">
+                <div className="flex items-center justify-between">
+                  <Link
+                    to="/notifications"
+                    className="text-xs text-primary hover:underline"
+                  >
+                    Ver todas
+                  </Link>
+                  <button
+                    onClick={clearAllNotifications}
+                    className="text-xs text-red-500 hover:underline"
+                  >
+                    Limpiar todas
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </li>

@@ -17,10 +17,27 @@ import VisualizacionMembresias from "../feature/Operador/SuscripcionesSmart/Susc
 import CarritoPuntosSmartDemo from "../feature/Operador/CarritoPuntosSmartDemo/CarritoPuntosSmartDemo";
 import NotFound from "../feature/NotFound/NotFound";
 import UserManagement from "../feature/Operador/GestionComercio/GestionTrabajadores/UserManagement";
+import BranchCommerce from "../feature/Operador/GestionComercio/GestionSucursales/BranchCommerce";
+import { HelperService } from "../core/services/HelperService";
+import SurveysCommerce from "../feature/Operador/GestionComercio/GestionSucursales/GestionEncuestas/SurveysCommerce";
+import StudiesCommerce from "../feature/Operador/GestionComercio/GestionSucursales/GestionEstudiosMercado/StudiesCommerce";
+import ProductsCommerce from "../feature/Operador/GestionComercio/GestionSucursales/GestionProductos/ProductsCommerce";
+import PromotionsCommerce from "../feature/Operador/GestionComercio/GestionSucursales/GestionPromociones/PromotionsCommerce";
+import TestWebSocketDirect from "../test/TestWebSocketDirect";
+import SmartAI from "../feature/Operador/SmartAI/SmartAI";
 
 function App() {
   const [loading, setLoading] = useState<boolean>(true);
   const { pathname } = useLocation();
+  const companyName = HelperService.getCompanyName();
+  const companyId = HelperService.getCompanyId();
+  const branchId = HelperService.getBranchId();
+  const branchName = HelperService.getBranchName();
+  const branchDireccion = HelperService.getBranchAddress();
+  const branchCategoriaId = HelperService.getBranchCategoryId();
+  const branchSubCategoriaId = HelperService.getBranchSubcategoryId();
+
+  const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -30,11 +47,17 @@ function App() {
     setTimeout(() => setLoading(false), 1000);
   }, []);
 
+  if (!googleMapsApiKey) {
+    console.error(
+      "Google Maps API key no está configurada en las variables de entorno"
+    );
+  }
+
   return loading ? (
     <Loader />
   ) : (
     <LoadScript
-      googleMapsApiKey="AIzaSyBbPgQh_qdLyrC0S8TJXPSEf2dZ_IF3SZ8"
+      googleMapsApiKey={googleMapsApiKey}
       libraries={["drawing", "places"]}
     >
       <Routes>
@@ -76,6 +99,7 @@ function App() {
         />
         <Route element={<ProtectedRoute allowedRoles={["commerce"]} />}>
           <Route element={<DefaultLayout />}>
+            <Route path="/test-websocket" element={<TestWebSocketDirect />} />
             <Route
               path="/mi-comercio"
               element={
@@ -86,10 +110,22 @@ function App() {
               }
             />
             <Route
+              path="/mis-sucursales"
+              element={
+                <>
+                  <PageTitle title="Mis Sucursales | Panel de Comercio Smart" />
+                  <BranchCommerce
+                    selectedCompanyId={companyId}
+                    selectedCompanyName={companyName}
+                  />
+                </>
+              }
+            />
+            <Route
               path="/mis-trabajadores"
               element={
                 <>
-                  <PageTitle title="Mi Comercio | Panel de Comercio Smart" />
+                  <PageTitle title="Mis Trabajadores | Panel de Comercio Smart" />
                   <UserManagement />
                 </>
               }
@@ -107,13 +143,22 @@ function App() {
               path="/mi-dashboard"
               element={
                 <>
-                  <PageTitle title="Mi Comercio | Panel de Comercio Smart" />
+                  <PageTitle title="Mi Dashboard | Panel de Comercio Smart" />
                   <SmartDashboard />
                 </>
               }
             />
             <Route
-              path="/mis-trabajasssssdores"
+              path="/mi-agente"
+              element={
+                <>
+                  <PageTitle title="Mi Dashboard | Panel de Comercio Smart" />
+                  <SmartAI  />
+                </>
+              }
+            />
+            <Route
+              path="/mis-trabajasssssdsaXxxasdasores"
               element={
                 <>
                   <PageTitle title="Mi Comercio | Panel de Comercio Smart" />
@@ -151,42 +196,78 @@ function App() {
             />
           </Route>
         </Route>
-        // NUEVAS RUTAS PARA BRANCH_MANAGER (NIVEL 3)
+
         <Route element={<ProtectedRoute allowedRoles={["branch_manager"]} />}>
           <Route element={<DefaultLayout />}>
-            <Route
-              path="/dashboard-sucursal"
-              element={
-                <>
-                  <PageTitle title="Dashboard | Gerente de Sucursal" />
-                  <SmartDashboard />{" "}
-                </>
-              }
-            />
-            <Route
-              path="/transacciones"
-              element={
-                <>
-                  <PageTitle title="Transacciones | Gerente de Sucursal" />
-                  <div>Historial de Transacciones</div>{" "}
-                </>
-              }
-            />
             <Route
               path="/mi-sucursal"
               element={
                 <>
-                  <PageTitle title="Mi Sucursal | Gerente de Sucursal" />
-                  <TradeInformationOperador />{" "}
+                  <PageTitle title="Mi Dashboard | Panel de Comercio Smart" />
+                  <SmartDashboard />
                 </>
               }
             />
             <Route
-              path="/perfil-sucursal"
+              path="/mis-trabajadores-sucursal"
               element={
                 <>
-                  <PageTitle title="Perfil | Gerente de Sucursal" />
-                  <SettingsCommerce />
+                  <PageTitle title="Mis Trabajadores | Panel de Comercio Smart" />
+                  <UserManagement />
+                </>
+              }
+            />
+            <Route
+              path="/mis-encuestas"
+              element={
+                <>
+                  <PageTitle title="Mi Dashboard | Panel de Comercio Smart" />
+                  <SurveysCommerce
+                    branchId={branchId}
+                    selectedBranchName={branchName}
+                    branchAddress={branchDireccion}
+                  />
+                </>
+              }
+            />
+            <Route
+              path="/mis-estudios"
+              element={
+                <>
+                  <PageTitle title="Mi Dashboard | Panel de Comercio Smart" />
+                  <StudiesCommerce
+                    branchId={branchId}
+                    selectedBranchName={branchName}
+                    branchAddress={branchDireccion}
+                  />
+                </>
+              }
+            />
+            <Route
+              path="/mis-promociones"
+              element={
+                <>
+                  <PageTitle title="Mi Dashboard | Panel de Comercio Smart" />
+                  <PromotionsCommerce
+                    branchId={branchId}
+                    selectedBranchName={branchName}
+                    branchAddress={branchDireccion}
+                  />
+                </>
+              }
+            />
+            <Route
+              path="/mis-productos"
+              element={
+                <>
+                  <PageTitle title="Mi Dashboard | Panel de Comercio Smart" />
+                  <ProductsCommerce
+                    branchId={branchId}
+                    selectedBranchName={branchName}
+                    branchAddress={branchDireccion}
+                    inheritedCategory={branchCategoriaId}
+                    inheritedSubcategory={branchSubCategoriaId}
+                  />
                 </>
               }
             />

@@ -1,15 +1,11 @@
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
   Tooltip,
   PieChart,
   Pie,
   Cell,
   ResponsiveContainer,
 } from "recharts";
+import { useState } from "react";
 
 const COLORS = [
   "#0088FE",
@@ -41,15 +37,21 @@ export interface SurveyStatsProps {
       respuestas: {
         id: number;
         respuesta: string;
-        total_respuestas?: number; // Ahora es opcional
+        total_respuestas?: number;
       }[];
     }[];
   };
 }
 
-export const SurveyStatsView = ({ stats }: SurveyStatsProps) => {
+// Interfaz para los elementos de distritosData
+interface DistritoData {
+  name: string;
+  value: number;
+  porcentaje: number;
+  otrosDistritos?: { nombre: string; cantidad_respuestas: number }[];
+}
 
-  // Calcular porcentajes para rangos de edades
+export const SurveyStatsView = ({ stats }: SurveyStatsProps) => {
   const totalEdades = Object.values(stats.rango_edades).reduce(
     (acc, curr) => acc + curr,
     0
@@ -62,7 +64,6 @@ export const SurveyStatsView = ({ stats }: SurveyStatsProps) => {
     })
   );
 
-  // Calcular porcentajes para género
   const totalGenero =
     stats.total_respuestas.female_respuestas +
     stats.total_respuestas.male_respuestas;
@@ -85,21 +86,48 @@ export const SurveyStatsView = ({ stats }: SurveyStatsProps) => {
     },
   ];
 
-  // Calcular porcentajes para distritos
   const totalDistritos = stats.respuestas_por_distrito.reduce(
     (acc, curr) => acc + curr.cantidad_respuestas,
     0
   );
-  const distritosData = stats.respuestas_por_distrito.map((distrito) => ({
-    name: distrito.nombre,
-    value: distrito.cantidad_respuestas,
-    porcentaje:
-      totalDistritos > 0
-        ? (distrito.cantidad_respuestas / totalDistritos) * 100
-        : 0,
-  }));
 
-  // Ordenar los rangos de edad para presentarlos correctamente
+  // Procesar datos de distritos
+  const maxDistritos = 4;
+  const distritosOrdenados = [...stats.respuestas_por_distrito].sort(
+    (a, b) => b.cantidad_respuestas - a.cantidad_respuestas
+  );
+  const distritosPrincipales = distritosOrdenados.slice(0, maxDistritos);
+  const distritosOtros = distritosOrdenados.slice(maxDistritos);
+  const totalOtros = distritosOtros.reduce(
+    (acc, curr) => acc + curr.cantidad_respuestas,
+    0
+  );
+
+  const distritosData: DistritoData[] = [
+    ...distritosPrincipales.map((distrito) => ({
+      name: distrito.nombre,
+      value: distrito.cantidad_respuestas,
+      porcentaje:
+        totalDistritos > 0
+          ? (distrito.cantidad_respuestas / totalDistritos) * 100
+          : 0,
+    })),
+    ...(distritosOtros.length > 0
+      ? [
+          {
+            name: "Otros",
+            value: totalOtros,
+            porcentaje:
+              totalDistritos > 0 ? (totalOtros / totalDistritos) * 100 : 0,
+            otrosDistritos: distritosOtros.map((d) => ({
+              nombre: d.nombre,
+              cantidad_respuestas: d.cantidad_respuestas,
+            })),
+          },
+        ]
+      : []),
+  ];
+
   const ordenRangosEdad: Record<string, number> = {
     "0-18": 1,
     "19-30": 2,
@@ -113,12 +141,34 @@ export const SurveyStatsView = ({ stats }: SurveyStatsProps) => {
     return (ordenRangosEdad[a.name] || 99) - (ordenRangosEdad[b.name] || 99);
   });
 
+  // Estado para el tooltip
+  const [tooltipContent, setTooltipContent] = useState<{
+    visible: boolean;
+    distritos: { nombre: string; cantidad_respuestas: number }[];
+    x: number;
+    y: number;
+  }>({ visible: false, distritos: [], x: 0, y: 0 });
+
+  const handleMouseEnter = (
+    e: React.MouseEvent<HTMLDivElement>,
+    distritos: { nombre: string; cantidad_respuestas: number }[]
+  ) => {
+    setTooltipContent({
+      visible: true,
+      distritos,
+      x: e.clientX,
+      y: e.clientY,
+    });
+  };
+
+  const handleMouseLeave = () => {
+    setTooltipContent({ visible: false, distritos: [], x: 0, y: 0 });
+  };
+
   return (
     <div className="w-full bg-white-translucent dark:bg-boxdark rounded-lg shadow-md">
       <div className="py-12 px-4 md:px-20">
-        {/* Contenedor principal para ambas secciones en horizontal */}
         <div className="flex flex-col md:flex-row md:space-x-4 space-y-4 md:space-y-0 mb-8">
-          {/* Rangos de Edad */}
           <div className="md:w-1/2 bg-gray-50 dark:bg-boxdark-2 rounded-lg p-4">
             <h3 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white">
               Rangos de Edad
@@ -146,7 +196,6 @@ export const SurveyStatsView = ({ stats }: SurveyStatsProps) => {
             </div>
           </div>
 
-          {/* Respuestas por Pregunta */}
           {stats.preguntas_y_respuestas &&
             stats.preguntas_y_respuestas.length > 0 && (
               <div className="md:w-1/2 bg-gray-50 dark:bg-boxdark-2 rounded-lg p-4">
@@ -155,7 +204,6 @@ export const SurveyStatsView = ({ stats }: SurveyStatsProps) => {
                 </h3>
                 <div className="space-y-4 max-h-60 overflow-y-auto pr-2">
                   {stats.preguntas_y_respuestas.map((pregunta) => {
-                    // Calcular el total de respuestas para esta pregunta
                     const totalRespuestasPregunta = pregunta.respuestas.reduce(
                       (acc, resp) => acc + (resp.total_respuestas || 0),
                       0
@@ -216,9 +264,7 @@ export const SurveyStatsView = ({ stats }: SurveyStatsProps) => {
             )}
         </div>
 
-        {/* Contenedor Flexible para Género y Distrito */}
         <div className="flex flex-col md:flex-row md:space-x-4 space-y-4 md:space-y-0 mb-8">
-          {/* Distribución por Género */}
           <div className="p-4 bg-gray-50 dark:bg-boxdark-2 rounded-lg md:w-1/2">
             <h3 className="text-lg font-semibold mb-2 text-black dark:text-white">
               Distribución por Género
@@ -250,29 +296,57 @@ export const SurveyStatsView = ({ stats }: SurveyStatsProps) => {
             </div>
           </div>
 
-          {/* Respuestas por Distrito */}
-          <div className="p-4 bg-gray-50 dark:bg-boxdark-2 rounded-lg md:w-1/2">
-            <h3 className="text-lg font-semibold mb-2 text-black dark:text-white">
+          <div className="md:w-1/2 bg-gray-50 dark:bg-boxdark-2 rounded-lg p-4">
+            <h3 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white">
               Respuestas por Distrito
             </h3>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={distritosData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" />
-                  <YAxis dataKey="name" type="category" width={100} />
-                  <Tooltip />
-                  <Bar dataKey="value" fill="#8884d8">
-                    {distritosData.map((_entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={COLORS[index % COLORS.length]}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+            <div className="space-y-4">
+              {distritosData.map((distrito) => (
+                <div
+                  key={distrito.name}
+                  className="flex items-center justify-between"
+                  onMouseEnter={
+                    distrito.otrosDistritos
+                      ? (e) => handleMouseEnter(e, distrito.otrosDistritos!)
+                      : undefined
+                  }
+                  onMouseLeave={
+                    distrito.otrosDistritos ? handleMouseLeave : undefined
+                  }
+                >
+                  <div className="w-24 truncate">{distrito.name}</div>
+                  <div className="flex-1 mx-4">
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4">
+                      <div
+                        className="bg-blue-400 h-4 rounded-full"
+                        style={{ width: `${distrito.porcentaje}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                  <div className="w-24 text-right">
+                    {distrito.value} ({distrito.porcentaje.toFixed(1)}%)
+                  </div>
+                </div>
+              ))}
             </div>
+            {tooltipContent.visible && (
+              <div
+                className="fixed bg-gray-800 text-white p-2 rounded shadow-lg z-50 text-sm"
+                style={{
+                  top: tooltipContent.y + 10,
+                  left: tooltipContent.x + 10,
+                }}
+              >
+                <h4 className="font-semibold mb-1">Otros Distritos:</h4>
+                <ul>
+                  {tooltipContent.distritos.map((d) => (
+                    <li key={d.nombre}>
+                      {d.nombre}: {d.cantidad_respuestas}
+                    </li>
+                  ))}|
+                </ul>
+              </div>
+            )}
           </div>
         </div>
       </div>

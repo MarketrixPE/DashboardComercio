@@ -1,50 +1,59 @@
 import { useEffect, useRef, useState } from "react";
 import Swal from "sweetalert2";
-import { Icon } from "@iconify/react/dist/iconify.js";
 import { LoadingDots } from "../../../shared/components/Atoms/LoadingDots/LoadingDots";
 import Uploader from "../../../shared/components/Atoms/Uploader";
-import TablaItem, {
-  RowData,
-  Column,
-} from "../../../shared/components/Molecules/TablaItem/TablaItem";
+import Cookies from "js-cookie";
 import {
   getCompanyDetails,
   updateCompany,
 } from "../../../core/services/Operador/TradeService/TradeService";
-import BranchCommerce from "./GestionSucursales/BranchCommerce";
-import { Tooltip } from "react-tooltip";
 import { validateRUC } from "../../../core/services/SunatService";
 import CustomDropdown from "../../../shared/components/Atoms/Dropdown/Dropdown";
 import { tradeOperatorValidations } from "./TradeOperatorValidations";
 import { HelperService } from "../../../core/services/HelperService";
 
+// Interfaz actualizada para los datos de la empresa
+interface CompanyData {
+  id: number;
+  nombre_comercial: string;
+  razon_social: string;
+  numero_documento: string;
+  tipo_documento: string;
+  numeros_contacto: string;
+  logo: string | null;
+  activo: number;
+  membership_id: number;
+  discount_plan_id: number;
+  encrypted_id: string;
+  user?: {
+    id: number;
+    name: string;
+    last_name: string;
+    email: string;
+    phone: string;
+  };
+}
+
 function TradeInformationOperador() {
-  const [data, setData] = useState<RowData[]>([]);
+  const [companyData, setCompanyData] = useState<CompanyData | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [currentCompanyId, setCurrentCompanyId] = useState(null);
   const [tipoDocumento, setTipoDocumento] = useState("6");
   const [numeroDocumento, setNumeroDocumento] = useState("");
   const [razonSocial, setRazonSocial] = useState("");
   const [nombreComercial, setNombreComercial] = useState("");
   const [numerosContacto, setNumeroscontacto] = useState("+51");
-  const [selectedCompanyName, setSelectedCompanyName] = useState<string>("");
-  const [isBranchView, setIsBranchView] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [logo, setLogo] = useState<File | null>(null);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const [membershipId, setMembershipId] = useState<number | "">(3);
-  const [discountPlanId, setDiscountPlanId] = useState<number | "">(1); // Default a 1 (10%)
-  const [showButton, setShowButton] = useState(false);
+  const [membershipId, setMembershipId] = useState<number>(3); // Default a 3 (Empresarial)
+  const [discountPlanId, setDiscountPlanId] = useState<number>(1); // Default a 1 (10%)
 
   const validateOperatorForm = (): boolean => {
     const documentError = tradeOperatorValidations.validateRUC(numeroDocumento);
-    const businessNameError =
-      tradeOperatorValidations.validateBusinessName(nombreComercial);
-    const razonError =
-      tradeOperatorValidations.validateRazonSocial(razonSocial);
-    const contactError =
-      tradeOperatorValidations.validateContactNumber(numerosContacto);
+    const businessNameError = tradeOperatorValidations.validateBusinessName(nombreComercial);
+    const razonError = tradeOperatorValidations.validateRazonSocial(razonSocial);
+    const contactError = tradeOperatorValidations.validateContactNumber(numerosContacto);
     const logoError = tradeOperatorValidations.validateLogo(logo, isEditing);
 
     const validationErrors: Record<string, string | undefined> = {
@@ -55,15 +64,10 @@ function TradeInformationOperador() {
       logo: logoError,
     };
 
-    // Filtrar y recolectar errores
-    const errors = Object.values(validationErrors).filter(
-      (error) => error !== undefined
-    );
+    const errors = Object.values(validationErrors).filter((error) => error !== undefined);
 
-    // Si hay errores, mostrarlos todos en una lista
     if (errors.length > 0) {
       const errorList = errors.map((error) => `• ${error}`).join("<br>");
-
       Swal.fire({
         icon: "error",
         title: "Errores de validación",
@@ -75,31 +79,31 @@ function TradeInformationOperador() {
     return true;
   };
 
-  const validateRUCOnChange = async (ruc: string) => {
-    try {
-      const rucInfo = await validateRUC(ruc);
-      if (rucInfo && rucInfo.razonSocial) {
-        Swal.fire(
-          "RUC válido",
-          `Razón Social: ${rucInfo.razonSocial || "No disponible"}`,
-          "success"
-        );
-        setRazonSocial(rucInfo.razonSocial || ""); // Rellenar campo en el formulario
-      } else {
-        Swal.fire({
-          icon: "error",
-          title: "RUC no válido",
-          text: "El RUC ingresado no es válido o no tiene datos asociados.",
-        });
-      }
-    } catch (error: any) {
-      Swal.fire({
-        icon: "error",
-        title: "Error en la validación",
-        text: error.message || "Ocurrió un problema al validar el RUC.",
-      });
-    }
-  };
+  // const validateRUCOnChange = async (ruc: string) => {
+  //   try {
+  //     const rucInfo = await validateRUC(ruc);
+  //     if (rucInfo && rucInfo.razonSocial) {
+  //       Swal.fire(
+  //         "RUC válido",
+  //         `Razón Social: ${rucInfo.razonSocial || "No disponible"}`,
+  //         "success"
+  //       );
+  //       setRazonSocial(rucInfo.razonSocial || "");
+  //     } else {
+  //       Swal.fire({
+  //         icon: "error",
+  //         title: "RUC no válido",
+  //         text: "El RUC ingresado no es válido o no tiene datos asociados.",
+  //       });
+  //     }
+  //   } catch (error: any) {
+  //     Swal.fire({
+  //       icon: "error",
+  //       title: "Error en la validación",
+  //       text: error.message || "Ocurrió un problema al validar el RUC.",
+  //     });
+  //   }
+  // };
 
   const handleCancelClick = () => {
     setShowForm(false);
@@ -111,82 +115,74 @@ function TradeInformationOperador() {
 
   const fetchData = async () => {
     setIsLoading(true);
-
     try {
       if (!encryptedCompanyId) {
-        setData([]);
-        setShowButton(true);
+        setCompanyData(null);
+        setShowForm(true); // Mostrar formulario si no hay datos
         Swal.fire({
           icon: "info",
           title: "No hay datos",
-          text: "No se encontró información de la compañía.",
+          text: "No se encontró información de la compañía. Por favor, ingrese los datos.",
         });
         return;
       }
 
-      // Obtener los detalles de la compañía usando el ID encriptado
       const company = await getCompanyDetails(encryptedCompanyId);
       if (!company) {
-        setData([]);
-        setShowButton(true);
+        setCompanyData(null);
+        setShowForm(true);
         Swal.fire({
           icon: "info",
           title: "No hay datos",
-          text: "No hay empresas disponibles para mostrar.",
+          text: "No hay información disponible para mostrar.",
         });
         return;
       }
 
-      const formattedData = [
-        {
-          id: company.id,
-          nombre_comercial: company.nombre_comercial,
-          status: company.activo === 1 ? "Activo" : "Inactivo",
-          activo: company.activo,
-          razon_social: company.razon_social,
-          numero_documento: company.numero_documento,
-          tipo_documento: company.tipo_documento,
-          numeros_contacto: company.numeros_contacto,
-          logo: company.logo,
-          encrypted_id: encryptedCompanyId, // Guardar el ID encriptado para usarlo después
-        },
-      ];
-      setData(formattedData);
-      setShowButton(false); // Ocultar el botón si hay datos
+      const formattedData: CompanyData = {
+        id: company.id,
+        nombre_comercial: company.nombre_comercial,
+        razon_social: company.razon_social,
+        numero_documento: company.numero_documento,
+        tipo_documento: company.tipo_documento,
+        numeros_contacto: company.numeros_contacto,
+        logo: company.logo,
+        activo: company.activo,
+        membership_id: company.membership_id || 3,
+        discount_plan_id: company.discount_plan_id || 1,
+        encrypted_id: encryptedCompanyId,
+        user: company.user, // Incluir datos del usuario
+      };
+      setCompanyData(formattedData);
+      setShowForm(false);
     } catch (error: any) {
       console.error("Error al cargar los datos:", error);
-      setShowButton(true); // Mostrar el botón en caso de error
+      setShowForm(true);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const onEdit = async (row: RowData) => {
+  const onEdit = async () => {
     clearFormFields();
-    setCurrentCompanyId(row.id);
     setShowForm(true);
     setIsEditing(true);
     setIsLoading(true);
-    console.log("first", encryptedCompanyId);
     try {
       if (!encryptedCompanyId) {
         throw new Error("No se encontró el ID encriptado de la compañía.");
       }
 
-      // Usando el endpoint para obtener detalles usando ID encriptado
       const company = await getCompanyDetails(encryptedCompanyId);
-
-      // Configurar los datos existentes de la empresa
       setTipoDocumento(company.tipo_documento);
       setNumeroDocumento(company.numero_documento);
       setRazonSocial(company.razon_social);
       setNombreComercial(company.nombre_comercial);
       setLogoUrl(company.logo);
-      setNumeroscontacto(company.numeros_contacto);
-
-      // Configurar los nuevos campos
-      setMembershipId(company.membership_id || 3); // Default a 3 (Infinity)
-      setDiscountPlanId(company.discount_plan_id || 1); // Default a 1 (10%)
+      // Usar el teléfono del usuario, no numeros_contacto
+      setNumeroscontacto(company.user?.phone || "+51");
+      setMembershipId(company.membership_id || 3);
+      setDiscountPlanId(company.discount_plan_id || 1);
     } catch (error: any) {
       Swal.fire({
         icon: "error",
@@ -203,15 +199,12 @@ function TradeInformationOperador() {
     setIsLoading(true);
 
     try {
-      // Validar RUC
       const rucInfo = await validateRUC(numeroDocumento);
       const membershipIdNumber = Number(membershipId);
       const discountPlanIdNumber = Number(discountPlanId);
 
       if (isNaN(membershipIdNumber) || isNaN(discountPlanIdNumber)) {
-        throw new Error(
-          "Debe seleccionar una membresía y un plan de descuento válidos."
-        );
+        throw new Error("Debe seleccionar una membresía y un plan de descuento válidos.");
       }
 
       const payload = {
@@ -226,8 +219,7 @@ function TradeInformationOperador() {
       };
 
       if (isEditing) {
-        // Obtener el ID encriptado (del objeto row o del localStorage)
-        const encryptedId = localStorage.getItem("commerce_company_id");
+        const encryptedId = Cookies.get("commerce_company_id");
         if (!encryptedId) {
           throw new Error("No se encontró el ID encriptado de la compañía.");
         }
@@ -242,8 +234,6 @@ function TradeInformationOperador() {
         setShowForm(false);
         fetchData();
       } else {
-        // Como no tenemos un método de creación con los 3 endpoints,
-        // podemos mostrar un mensaje de que esta funcionalidad no está disponible
         Swal.fire({
           icon: "warning",
           title: "Funcionalidad no disponible",
@@ -268,86 +258,13 @@ function TradeInformationOperador() {
     }
   }, []);
 
-  const columns: Column[] = [
-    {
-      Header: "Acciones",
-      Cell: (row: RowData) => (
-        <div className="flex space-x-2">
-          <button
-            id="tooltip-branch"
-            className="relative pl-1 bg-green-500 text-slate-50 flex items-center rounded-lg group overflow-hidden transition-all duration-500 ease-in-out w-[2rem] hover:w-[8rem]"
-            onClick={() => onBranch(row)}
-          >
-            <Icon
-              icon="material-symbols:home"
-              className="flex-shrink-0 "
-              width="24"
-              height="24"
-            />
-
-            <span className="ml-0 opacity-0 translate-x-[-10px] group-hover:opacity-100 group-hover:translate-x-0 group-hover:ml-2 transition-all duration-500 ease-in-out delay-100">
-              Sucursales
-            </span>
-          </button>
-
-          <button
-            className="relative p-2 bg-blue-500 text-slate-50 flex items-center rounded-lg group overflow-hidden transition-all duration-500 ease-in-out w-[2rem] hover:w-[6rem]"
-            onClick={() => onEdit(row)}
-          >
-            <i className="far fa-edit"></i>
-            <span className="ml-0 opacity-0 translate-x-[-10px] group-hover:opacity-100 group-hover:translate-x-0 group-hover:ml-2 transition-all duration-500 ease-in-out delay-100">
-              Editar
-            </span>
-          </button>
-        </div>
-      ),
-    },
-    {
-      Header: "Nombre ",
-      accessor: "nombre_comercial" as keyof RowData,
-    },
-    { Header: "Razón Social", accessor: "razon_social" as keyof RowData },
-    {
-      Header: "Estado",
-      accessor: "activo" as keyof RowData,
-      Cell: (row: RowData) => (
-        <span
-          className={
-            row.activo === 1
-              ? "text-white bg-green-500 px-3 py-1 rounded-md"
-              : "text-white bg-red-500 px-3 py-1 rounded-md"
-          }
-        >
-          {row.activo === 1 ? "Activo" : "Inactivo"}
-        </span>
-      ),
-    },
-  ];
-
-  const onBranch = (row: RowData) => {
-    setCurrentCompanyId(row.id);
-    setSelectedCompanyName(row.nombre_comercial);
-    setIsBranchView(true);
-  };
-
-  const handleButtonClick = () => {
-    clearFormFields();
-    setShowForm(true);
-    setIsEditing(false);
-  };
-
-  const handleBackToTrade = () => {
-    setIsBranchView(false);
-    fetchData();
-  };
-
   const clearFormFields = () => {
     setTipoDocumento("6");
     setNumeroDocumento("");
     setRazonSocial("");
     setNombreComercial("");
-    setDiscountPlanId(1); // Default a 1 (10%)
-    setMembershipId(3); // Default a 3 (Infinity)
+    setDiscountPlanId(1);
+    setMembershipId(3);
     setLogo(null);
   };
 
@@ -356,12 +273,12 @@ function TradeInformationOperador() {
     return "bg-blue-600 text-white hover:bg-blue-700";
   };
 
-  const discountPlans = [{ id: 1, text: "10%" }];
-  const membershipPlans = [{ id: 3, text: "Infinity" }];
+  // const discountPlans = [{ id: 1, text: "10%" }];
+  const membershipPlans = [{ id: 3, text: "Empresarial" }];
 
   return (
-    <>
-      {showForm && (
+    <div className="container mx-auto my-8">
+      {showForm ? (
         <div className="formulario">
           <div className="flex flex-col gap-4 shadow-xl p-4 sm:p-6 md:p-8 rounded-lg container mx-auto bg-white-translucent dark:bg-boxdark my-4 sm:my-8">
             {/* Header */}
@@ -369,6 +286,7 @@ function TradeInformationOperador() {
               <i
                 className="fas fa-chevron-left text-white bg-[#1c2434] p-2 rounded-full flex items-center justify-center w-8 h-8 cursor-pointer"
                 onClick={handleCancelClick}
+                aria-label="Volver"
               ></i>
               <label className="text-base sm:text-lg md:text-title-md2 font-semibold text-black dark:text-white">
                 {isEditing
@@ -392,6 +310,7 @@ function TradeInformationOperador() {
                   value={tipoDocumento}
                   onChange={(e) => setTipoDocumento(e.target.value)}
                   className="w-full rounded border border-stroke py-2 sm:py-3 px-4 sm:pl-3.5 sm:pr-4.5 dark:bg-boxdark dark:border-strokedark dark:text-white"
+                  disabled={isLoading}
                 >
                   <option value="6">RUC</option>
                 </select>
@@ -407,11 +326,10 @@ function TradeInformationOperador() {
                   onChange={(e) => {
                     const ruc = e.target.value.replace(/\D/g, "").slice(0, 11);
                     setNumeroDocumento(ruc);
-                    if (ruc.length === 11) {
-                      validateRUCOnChange(ruc);
-                    }
+                    // Removida la validación automática del RUC
                   }}
                   className="w-full rounded border border-stroke py-2 sm:py-3 px-4 sm:pl-3.5 sm:pr-4.5 dark:bg-boxdark dark:border-strokedark dark:text-white"
+                  disabled={isLoading}
                 />
               </div>
             </div>
@@ -426,6 +344,7 @@ function TradeInformationOperador() {
                   value={nombreComercial}
                   onChange={(e) => setNombreComercial(e.target.value)}
                   className="w-full rounded border border-stroke py-2 sm:py-3 px-4 sm:pl-3.5 sm:pr-4.5 dark:bg-boxdark dark:border-strokedark dark:text-white"
+                  disabled={isLoading}
                 />
               </div>
               <div className="w-full sm:w-[33%]">
@@ -436,6 +355,7 @@ function TradeInformationOperador() {
                   value={razonSocial}
                   onChange={(e) => setRazonSocial(e.target.value)}
                   className="w-full rounded border border-stroke py-2 sm:py-3 px-4 sm:pl-3.5 sm:pr-4.5 dark:bg-boxdark dark:border-strokedark dark:text-white"
+                  disabled={isLoading}
                 />
               </div>
               <div className="w-full sm:w-[33%]">
@@ -453,11 +373,12 @@ function TradeInformationOperador() {
                     }
                   }}
                   className="w-full rounded border border-stroke py-2 sm:py-3 px-4 sm:pl-3.5 sm:pr-4.5 dark:bg-boxdark dark:border-strokedark dark:text-white"
+                  disabled={isLoading}
                 />
               </div>
             </div>
 
-            {/* Membresía y Plan de Descuento */}
+            {/* Membresía */}
             <div className="flex flex-col sm:flex-row w-full gap-4">
               <div className="w-full sm:w-[49%]">
                 <label className="mb-2 sm:mb-3 block text-sm font-medium text-black dark:text-white">
@@ -466,7 +387,7 @@ function TradeInformationOperador() {
                 <div data-tooltip-id="membershipTooltip">
                   <CustomDropdown
                     options={membershipPlans}
-                    value={membershipId ? Number(membershipId) : null}
+                    value={membershipId}
                     onChange={(value) => setMembershipId(value)}
                     placeholder="Seleccione una membresía"
                     className="dark:bg-boxdark dark:border-strokedark dark:text-white cursor-help"
@@ -474,42 +395,20 @@ function TradeInformationOperador() {
                     defaultValue={3}
                   />
                 </div>
-                <Tooltip
-                  id="membershipTooltip"
-                  content="Por los 3 primeros meses eres Infinity"
-                  place="top"
-                  className="bg-black dark:bg-boxdark text-white"
-                />
-              </div>
-              <div className="w-full sm:w-[49%] hidden">
-                {/* <label className="mb-2 sm:mb-3 block text-sm font-medium text-black dark:text-white">
-                  Plan de Descuento
-                </label> */}
-                <CustomDropdown
-                  options={discountPlans}
-                  value={discountPlanId ? Number(discountPlanId) : null}
-                  onChange={(value) => setDiscountPlanId(value)}
-                  placeholder="Seleccione un plan de descuento"
-                  className="dark:bg-boxdark dark:border-strokedark dark:text-white"
-                />
               </div>
             </div>
 
             {/* Logo */}
             <div className="w-full">
               <label className="mb-2 sm:mb-3 block text-sm font-medium text-black dark:text-white">
-                {isEditing
-                  ? "Editar logo de comercio"
-                  : "Agregar logo de comercio"}
+                {isEditing ? "Editar logo de comercio" : "Agregar logo de comercio"}
               </label>
               <Uploader
                 onFileSelect={(file) => setLogo(file)}
                 accept="image/jpeg, image/jpg, image/png"
-                maxSize={10 * 1024 * 1024}
+                maxSize={5 * 1024 * 1024} // Reducido a 5 MB
                 label="Sube tu logo aquí"
-                initialPreview={
-                  logo ? URL.createObjectURL(logo) : logoUrl || undefined
-                }
+                initialPreview={logo ? URL.createObjectURL(logo) : logoUrl || undefined}
                 className="w-full rounded border border-stroke py-2 sm:py-3 px-4 text-black dark:text-white dark:border-strokedark dark:bg-boxdark focus:border-primary"
               />
             </div>
@@ -528,45 +427,86 @@ function TradeInformationOperador() {
                 onClick={handleSubmit}
                 className={`w-full sm:w-auto flex justify-center rounded py-2 px-4 sm:px-6 font-medium ${getSaveButtonClass()}`}
                 disabled={isLoading}
-                aria-label={
-                  isEditing ? "Actualizar empresa" : "Guardar empresa"
-                }
+                aria-label={isEditing ? "Actualizar empresa" : "Guardar empresa"}
               >
-                {isLoading ? (
-                  <LoadingDots />
-                ) : isEditing ? (
-                  "Actualizar"
-                ) : (
-                  "Guardar"
-                )}
+                {isLoading ? <LoadingDots /> : isEditing ? "Actualizar" : "Guardar"}
               </button>
             </div>
           </div>
         </div>
-      )}
-      {!isBranchView && !showForm && (
-        <div className="container mx-auto my-8">
-          <TablaItem
-            data={data}
-            columns={columns}
-            title="Mi Comercio Smart"
-            buttonLabel="Agregar Comercio"
-            onButtonClick={handleButtonClick}
-            onEdit={onEdit}
-            showNewButton={false}
-            showButton={showButton}
-          />
+      ) : (
+        <div className="bg-white dark:bg-boxdark shadow-xl rounded-lg p-6 sm:p-8">
+          {isLoading ? (
+            <div className="flex justify-center items-center h-64">
+              <LoadingDots />
+            </div>
+          ) : companyData ? (
+            <div className="flex flex-col sm:flex-row gap-6">
+              {/* Logo */}
+              <div className="flex-shrink-0">
+                <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-full border-4 border-gray-300 dark:border-strokedark flex items-center justify-center overflow-hidden">
+                  {companyData.logo ? (
+                    <img
+                      src={companyData.logo}
+                      alt="Logo de la empresa"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-gray-500 dark:text-gray-400">
+                      Sin logo
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Información */}
+              <div className="flex-1">
+                <div className="flex justify-between items-center mb-4">
+                  <h1 className="text-2xl sm:text-3xl font-bold text-black dark:text-white">
+                    {companyData.nombre_comercial}
+                  </h1>
+                  <button
+                    onClick={onEdit}
+                    className="bg-blue-500 text-white rounded-lg py-2 px-4 hover:bg-blue-600 transition duration-300"
+                    aria-label="Editar información del comercio"
+                  >
+                    Editar
+                  </button>
+                </div>
+
+                <h2 className="text-lg sm:text-xl font-semibold text-gray-700 dark:text-gray-300 mb-4">
+                  {companyData.razon_social}
+                </h2>
+
+                <div className="space-y-3 text-gray-600 dark:text-gray-400">
+                  <p>
+                    <span className="font-medium text-black dark:text-white">Tipo de Documento:</span>{" "}
+                    {companyData.tipo_documento === "6" ? "RUC" : "Otro"}
+                  </p>
+                  <p>
+                    <span className="font-medium text-black dark:text-white">Número de Documento:</span>{" "}
+                    {companyData.numero_documento}
+                  </p>
+                  <p>
+                    <span className="font-medium text-black dark:text-white">Número de Contacto:</span>{" "}
+                    {/* Usar el teléfono del usuario, con fallback a numeros_contacto */}
+                    {companyData.user?.phone || companyData.numeros_contacto || "No disponible"}
+                  </p>
+                  <p>
+                    <span className="font-medium text-black dark:text-white">Membresía:</span>{" "}
+                    {membershipPlans.find((plan) => plan.id === companyData.membership_id)?.text || "Empresarial"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center text-gray-600 dark:text-gray-400">
+              No hay información disponible. Por favor, agregue los datos del comercio.
+            </div>
+          )}
         </div>
       )}
-
-      {isBranchView && (
-        <BranchCommerce
-          selectedCompanyId={currentCompanyId}
-          selectedCompanyName={selectedCompanyName}
-          onBackClick={handleBackToTrade}
-        />
-      )}
-    </>
+    </div>
   );
 }
 

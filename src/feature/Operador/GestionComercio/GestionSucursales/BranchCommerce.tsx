@@ -1,16 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import Swal from "sweetalert2";
-import TablaItem, {
-  Column,
-  RowData,
-} from "../../../../shared/components/Molecules/TablaItem/TablaItem";
 import LocationPicker from "../../../../shared/components/Organisms/LocationPicker/LocationPicker";
 import Uploader from "../../../../shared/components/Atoms/Uploader";
 import { LoadingDots } from "../../../../shared/components/Atoms/LoadingDots/LoadingDots";
 import iconEstuMercado from "../../../../assets/svg/iconEstudiosMercados.svg";
 import iconPromotions from "../../../../assets/svg/iconPromocionesSmart.svg";
-
 import {
   createBranch,
   getBranchById,
@@ -26,11 +21,28 @@ import { branchValidations } from "./BranchValidations";
 import StudiesCommerce from "./GestionEstudiosMercado/StudiesCommerce";
 import { HelperService } from "../../../../core/services/HelperService";
 import PromotionsCommerce from "./GestionPromociones/PromotionsCommerce";
+import { ChevronLeft } from "lucide-react";
+import "./BranchCommerce.css";
+
+interface RowData {
+  id: string;
+  uuid: string;
+  item: string;
+  address: string;
+  contact: string;
+  status: string;
+  departamento?: string;
+  provincia?: string;
+  distrito?: string;
+  horarios?: string;
+  latitud?: string;
+  longitud?: string;
+}
 
 interface BranchProps {
   selectedCompanyId: string | null;
-  selectedCompanyName: string;
-  onBackClick: () => void;
+  selectedCompanyName: string | null;
+  onBackClick?: () => void;
 }
 
 export function BranchCommerce({
@@ -43,19 +55,14 @@ export function BranchCommerce({
   const [branchAddress, setBranchAddress] = useState("");
   const [branchStatus, setBranchStatus] = useState("Activo");
   const [branchContact, setBranchContact] = useState("+51");
-
   const [branchSchedule, setBranchSchedule] = useState("");
-  const [, setBranchCoordinates] = useState({
-    lat: "",
-    long: "",
-  });
+  const [, setBranchCoordinates] = useState({ lat: "", long: "" });
   const [showBranchForm, setShowBranchForm] = useState(false);
   const [isBranchEditing, setIsBranchEditing] = useState(false);
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
   const [selectedBranchName, setSelectedBranchName] = useState<string>("");
   const [selectedBranchAddress, setSelectedBranchAddress] =
     useState<string>("");
-
   const [departamento, setDepartamento] = useState("");
   const [provincia, setProvincia] = useState("");
   const [distrito, setDistrito] = useState("");
@@ -83,9 +90,14 @@ export function BranchCommerce({
   );
   const [canCreateBranch, setCanCreateBranch] = useState(true);
   const [isNewImageSelected, setIsNewImageSelected] = useState(false);
-  {
-    /*-------------- INICIO DATA SELECT ----------------- */
-  }
+  const [isFlipped, setIsFlipped] = useState<{ [key: string]: boolean }>({});
+
+  const handleFlip = (id: string) => {
+    setIsFlipped((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
+  };
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -118,15 +130,13 @@ export function BranchCommerce({
     fetchSubcategories();
   }, [selectedCategory]);
 
-  // Check branch creation limits
   useEffect(() => {
     const checkBranchCreationLimit = async () => {
       try {
         const limitData = await checkBranchLimit();
-        setCanCreateBranch(limitData.can_create || true); // Default to true if property doesn't exist
+        setCanCreateBranch(limitData.can_create || true);
       } catch (error) {
         console.error("Error al verificar límite de sucursales:", error);
-        // Default to true to not block functionality if check fails
         setCanCreateBranch(true);
       }
     };
@@ -136,20 +146,14 @@ export function BranchCommerce({
     }
   }, [selectedCompanyId]);
 
-  {
-    /*-------------- FIN DATA SELECT ----------------- */
-  }
-
   const encryptedCompanyId = HelperService.getCompanyId() || "";
 
   const fetchBranches = async () => {
     setIsLoading(true);
     try {
       const branches = await getBranchesByCompanyId(encryptedCompanyId);
-      console.log(branches, "branches");
       if (branches.length === 0) {
         setData([]);
-
         if (isInitialLoad) {
           Swal.fire({
             icon: "info",
@@ -196,8 +200,6 @@ export function BranchCommerce({
     }
   }, [selectedCompanyId]);
 
-  //CRUD
-
   const validateBranchForm = (): boolean => {
     const descriptionError =
       branchValidations.validateDescription(branchDescription);
@@ -223,15 +225,12 @@ export function BranchCommerce({
       logo: logoError,
     };
 
-    // Filtrar y recolectar errores
     const errors = Object.values(validationErrors).filter(
       (error) => error !== undefined
     );
 
-    // Si hay errores, mostrarlos todos en una lista
     if (errors.length > 0) {
       const errorList = errors.map((error) => `• ${error}`).join("<br>");
-
       Swal.fire({
         icon: "error",
         title: "Errores de validación",
@@ -244,7 +243,6 @@ export function BranchCommerce({
   };
 
   const saveOrUpdateBranch = async () => {
-    // Check branch limit if creating a new branch
     if (!isBranchEditing && !canCreateBranch) {
       Swal.fire({
         icon: "warning",
@@ -260,7 +258,6 @@ export function BranchCommerce({
     try {
       const formData = new FormData();
 
-      // Campos básicos
       formData.append("descripcion", branchDescription);
       formData.append("direccion", branchAddress);
       formData.append("numeros_contacto", branchContact);
@@ -268,19 +265,16 @@ export function BranchCommerce({
       formData.append("latitud", latitud);
       formData.append("longitud", longitud);
 
-      // Campos adicionales
       if (departamento) formData.append("departamento", departamento);
       if (provincia) formData.append("provincia", provincia);
       if (distrito) formData.append("distrito", distrito);
 
-      // Categoría y subcategoría
       if (selectedCategory)
         formData.append("category_id", selectedCategory.toString());
       if (selectedSubcategory)
         formData.append("subcategory_id", selectedSubcategory.toString());
 
       if (!isBranchEditing) {
-        // CREACIÓN: requiere todos los campos específicos de creación
         formData.append("company_id", encryptedCompanyId);
         formData.append("activo", branchStatus === "Activo" ? "1" : "0");
         if (typeof likes !== "undefined")
@@ -288,7 +282,6 @@ export function BranchCommerce({
         if (typeof rating !== "undefined")
           formData.append("rating", rating.toString());
 
-        // Para creación, la imagen es obligatoria
         if (logo && logo instanceof File) {
           formData.append("imagen", logo);
         } else {
@@ -302,10 +295,8 @@ export function BranchCommerce({
 
       try {
         if (isBranchEditing && selectedBranchId) {
-          // Actualización
           formData.append("branch_id", selectedBranchId);
 
-          // Log para depuración
           console.log("Enviando datos para actualización:");
           for (let [key, value] of formData.entries()) {
             console.log(
@@ -316,7 +307,6 @@ export function BranchCommerce({
           }
 
           const updateResponse = await updateBranch(selectedBranchId, formData);
-          console.log("Update Response:", updateResponse);
 
           if (updateResponse.status === "success" || updateResponse.success) {
             Swal.fire({
@@ -333,12 +323,11 @@ export function BranchCommerce({
             );
           }
         } else {
-          // Creación
           const createResponse = await createBranch(formData);
           if (createResponse.success || createResponse.status === "success") {
             Swal.fire({
-              icon: "success", // Cambiado de "error" a "success"
-              title: "¡Creado!", // Título corregido
+              icon: "success",
+              title: "¡Creado!",
               text:
                 createResponse.message ||
                 "La sucursal fue creada correctamente.",
@@ -377,11 +366,7 @@ export function BranchCommerce({
 
   const onEdit = async (row: RowData) => {
     try {
-      console.log("ID de la sucursal a editar:", row.id);
       const branchData = await getBranchById(row.id);
-      console.log("Datos de la sucursal obtenidos:", branchData);
-
-      console.log(branchData, "branchData");
       if (!branchData) {
         Swal.fire("Error", "No se encontró la sucursal.", "error");
         return;
@@ -395,14 +380,11 @@ export function BranchCommerce({
       setBranchSchedule(branchData.horarios || "");
       setLatitud(branchData.latitud || "-12.046309176843495");
       setLongitud(branchData.longitud || "-77.04274243266966");
-      // Al editar, conservamos la URL de la imagen pero no es un archivo nuevo
       setLogo(branchData.imagen || null);
-      setIsNewImageSelected(false); // Importante: resetear este estado
-
+      setIsNewImageSelected(false);
       setDistrito(branchData.distrito || "");
       await delay(100);
 
-      // Adjusted for new API structure - directly use category_id and subcategory_id if available
       if (branchData.category_id) {
         setSelectedCategory(branchData.category_id);
       } else if (branchData.categories && branchData.categories.length > 0) {
@@ -459,11 +441,45 @@ export function BranchCommerce({
   const delay = (ms: number) =>
     new Promise((resolve) => setTimeout(resolve, ms));
 
-  const onProd = (row: RowData) => {
-    setSelectedBranchId(row.id);
-    setSelectedBranchName(row.item);
-    setSelectedBranchAddress(row.address);
-    setIsProductView(true);
+  const onProd = async (row: RowData) => {
+    try {
+      const branchData = await getBranchById(row.id);
+      if (!branchData) {
+        Swal.fire("Error", "No se encontró la sucursal.", "error");
+        return;
+      }
+
+      if (branchData.category_id) {
+        setSelectedCategory(branchData.category_id);
+      } else if (branchData.categories && branchData.categories.length > 0) {
+        setSelectedCategory(branchData.categories[0]?.id || null);
+      } else {
+        setSelectedCategory(null);
+      }
+
+      if (branchData.subcategory_id) {
+        setSelectedSubcategory(branchData.subcategory_id);
+      } else if (
+        branchData.subcategories &&
+        branchData.subcategories.length > 0
+      ) {
+        setSelectedSubcategory(branchData.subcategories[0]?.id || null);
+      } else {
+        setSelectedSubcategory(null);
+      }
+
+      setSelectedBranchId(row.id);
+      setSelectedBranchName(row.item);
+      setSelectedBranchAddress(row.address);
+      setIsProductView(true);
+    } catch (error) {
+      console.error("Error al cargar los datos de la sucursal:", error);
+      Swal.fire(
+        "Error",
+        "No se pudo cargar los datos de la sucursal.",
+        "error"
+      );
+    }
   };
 
   const onSur = (row: RowData) => {
@@ -482,17 +498,11 @@ export function BranchCommerce({
     setSelectedBranchId(row.id);
     setSelectedBranchName(row.item);
     setSelectedBranchAddress(row.address);
-    // Añadir estas dos líneas
     setLatitud(row.latitud || "");
     setLongitud(row.longitud || "");
     setIsPromotionsView(true);
-    
-    // Opcional: agregar un log para verificar
-    console.log("Coordenadas seleccionadas:", {
-      latitud: row.latitud,
-      longitud: row.longitud
-    });
   };
+
   const handleBackToTrade = () => {
     setIsProductView(false);
     setIsSurveysView(false);
@@ -509,26 +519,35 @@ export function BranchCommerce({
     try {
       const geocoder = new google.maps.Geocoder();
       const latlng = { lat: parseFloat(lat), lng: parseFloat(lng) };
-
       const response = await geocoder.geocode({ location: latlng });
 
       if (response.results[0]) {
-        // Limpiar la dirección eliminando el código plus
         const fullAddress = response.results[0].formatted_address;
         const cleanAddress = fullAddress.replace(
           /^[A-Z0-9]+\+[A-Z0-9]+,\s*/,
           ""
         );
-
         setBranchAddress(cleanAddress);
+      } else {
+        Swal.fire({
+          icon: "warning",
+          title: "Dirección no encontrada",
+          text: "No se pudo obtener una dirección válida para las coordenadas seleccionadas.",
+        });
+        setBranchAddress("");
       }
     } catch (error) {
       console.error("Error al obtener la dirección:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "No se pudo conectar con el servicio de geolocalización.",
+      });
+      setBranchAddress("");
     }
   };
 
   const onButtonClick = () => {
-    // Check if user can create more branches before showing the form
     if (!canCreateBranch) {
       Swal.fire({
         icon: "warning",
@@ -552,112 +571,31 @@ export function BranchCommerce({
     }
   };
 
-  const columns: Column[] = [
-    {
-      Header: "Acciones",
-      Cell: (row: RowData) => (
-        <div className="flex space-x-2">
-          <button
-            title="Encuestas"
-            className="relative pl-1.5 bg-[#81C784] text-slate-50 flex items-center rounded-lg group overflow-hidden transition-all duration-500 ease-in-out w-[2rem] hover:w-[7rem]"
-            onClick={() => onSur(row)}
-          >
-            <Icon
-              icon="wpf:survey"
-              className="flex-shrink-0"
-              width="20"
-              height="20"
-            />
-            <span className="ml-0 opacity-0 translate-x-[-10px] group-hover:opacity-100 group-hover:translate-x-0 group-hover:ml-2 transition-all duration-500 ease-in-out delay-100">
-              Encuestas
-            </span>
-          </button>
-
-          <button
-            title="Estudios de Mercado"
-            className="relative pl-1.5 bg-[#9575CD] text-slate-50 flex items-center rounded-lg group overflow-hidden transition-all duration-500 ease-in-out w-[2rem] hover:w-[9rem]"
-            onClick={() => onStud(row)}
-          >
-            <img
-              src={iconEstuMercado}
-              alt="Estudios de Mercado"
-              className="flex-shrink-0 w-5 h-5"
-            />
-            <span className="ml-0 opacity-0 translate-x-[-10px] group-hover:opacity-100 group-hover:translate-x-0 group-hover:ml-2 transition-all duration-500 ease-in-out delay-100 whitespace-nowrap">
-              E. de mercado
-            </span>
-          </button>
-
-          <button
-            title="Promociones Smart"
-            className="relative pl-1.5 bg-[#b375cd] text-slate-50 flex items-center rounded-lg group overflow-hidden transition-all duration-500 ease-in-out w-[2rem] hover:w-[10rem]"
-            onClick={() => onPro(row)}
-          >
-            <img
-              src={iconPromotions}
-              alt="Estudios de Mercado"
-              className="flex-shrink-0 w-5 h-5"
-            />
-            <span className="ml-0 opacity-0 translate-x-[-10px] group-hover:opacity-100 group-hover:translate-x-0 group-hover:ml-2 transition-all duration-500 ease-in-out delay-100 whitespace-nowrap">
-              Promociones Smart
-            </span>
-          </button>
-
-          <button
-            title="Productos"
-            className="relative pl-1.5 bg-[#64B5F6] text-slate-50 flex items-center rounded-lg group overflow-hidden transition-all duration-500 ease-in-out w-[2rem] hover:w-[7rem]"
-            onClick={() => onProd(row)}
-          >
-            <Icon
-              icon="dashicons:products"
-              className="flex-shrink-0"
-              width="20"
-              height="20"
-            />
-            <span className="ml-0 opacity-0 translate-x-[-10px] group-hover:opacity-100 group-hover:translate-x-0 group-hover:ml-2 transition-all duration-500 ease-in-out delay-100">
-              Productos
-            </span>
-          </button>
-
-          <button
-            className="relative p-2 bg-blue-500 text-slate-50 flex items-center rounded-lg group overflow-hidden transition-all duration-500 ease-in-out w-[2rem] hover:w-[5rem]"
-            onClick={() => onEdit(row)}
-          >
-            <i className="far fa-edit"></i>
-            <span className="ml-0 opacity-0 translate-x-[-10px] group-hover:opacity-100 group-hover:translate-x-0 group-hover:ml-2 transition-all duration-500 ease-in-out delay-100">
-              Editar
-            </span>
-          </button>
-        </div>
-      ),
-    },
-    { Header: "Descripción", accessor: "item" as keyof RowData },
-    { Header: "Dirección", accessor: "address" as keyof RowData },
-    { Header: "Contacto", accessor: "contact" as keyof RowData },
-    {
-      Header: "Estado",
-      accessor: "status" as keyof RowData,
-      Cell: (row: RowData) => (
-        <span
-          className={
-            row.status === "Activo"
-              ? "text-white bg-green-500 px-3 py-1 rounded-md"
-              : "text-white bg-red-500 px-3 py-1 rounded-md"
-          }
-        >
-          {row.status}
-        </span>
-      ),
-    },
-  ];
-
   return (
     <>
+      <style>
+        {`
+          .perspective-1000 {
+            perspective: 1000px;
+          }
+          .transform-style-3d {
+            transform-style: preserve-3d;
+            transition: transform 0.5s;
+          }
+          .backface-hidden {
+            backface-visibility: hidden;
+          }
+          .flip {
+            transform: rotateY(180deg);
+          }
+          .rotate-y-180 {
+            transform: rotateY(180deg);
+          }
+        `}
+      </style>
       {showBranchForm && (
-        // Contenedor principal
         <div className="shadow-xl p-4 sm:p-6 md:p-8 rounded-lg container mx-auto bg-white-translucent dark:bg-boxdark">
           <div className="flex flex-col">
-            {/* Header del formulario */}
             <div className="flex items-center gap-2 sm:gap-4">
               <i
                 className="fas fa-chevron-left text-white bg-[#1c2434] p-2 rounded-full flex items-center justify-center w-8 h-8 cursor-pointer"
@@ -670,9 +608,7 @@ export function BranchCommerce({
               </label>
             </div>
 
-            {/* Contenedor de campos */}
             <div className="flex flex-col mt-4 space-y-4">
-              {/* Campos básicos */}
               <label className="block">
                 <span className="block text-sm font-medium mb-1">
                   Nombre o Descripción *
@@ -695,7 +631,6 @@ export function BranchCommerce({
                 />
               </label>
 
-              {/* Grupo de categorías */}
               <div className="w-full flex flex-col sm:flex-row gap-4">
                 <div className="w-full sm:w-1/2">
                   <label className="block text-sm font-medium mb-1">
@@ -741,7 +676,6 @@ export function BranchCommerce({
                 </div>
               </div>
 
-              {/* Grupo de contacto y horarios */}
               <div className="w-full flex flex-col sm:flex-row gap-4">
                 <label className="w-full sm:w-1/2">
                   <span className="block text-sm font-medium mb-1">
@@ -768,7 +702,6 @@ export function BranchCommerce({
                 </label>
               </div>
 
-              {/* Estado */}
               <select
                 className="w-full rounded border border-stroke py-2 sm:py-3 px-4 sm:pl-3.5 sm:pr-4.5 dark:bg-boxdark dark:border-strokedark dark:text-white text-sm sm:text-base"
                 value={branchStatus === "Activo" ? "1" : "0"}
@@ -782,7 +715,7 @@ export function BranchCommerce({
                 <option value="1">Activo</option>
                 <option value="0">Inactivo</option>
               </select>
-              {/* Grupo de ubicación y logo */}
+
               <div className="w-full flex flex-col lg:flex-row gap-4">
                 <div className="w-full lg:w-1/2 flex flex-col">
                   <label className="block text-sm font-medium mb-3">
@@ -807,7 +740,7 @@ export function BranchCommerce({
                       setIsNewImageSelected(true);
                     }}
                     accept="image/jpeg, image/jpg, image/png"
-                    maxSize={10 * 1024 * 1024}
+                    maxSize={100 * 1024 * 1024}
                     label="Sube tu logo aquí"
                     initialPreview={typeof logo === "string" ? logo : undefined}
                     className="w-full rounded border border-stroke py-3 px-4 text-black dark:text-white dark:border-strokedark dark:bg-boxdark focus:border-primary"
@@ -817,7 +750,6 @@ export function BranchCommerce({
             </div>
           </div>
 
-          {/* Botones de acción */}
           <div className="mt-6 flex flex-col sm:flex-row justify-end gap-3 sm:gap-4.5">
             <button
               className="w-full sm:w-auto text-[#3c50e0] border-[#3c50e0] rounded border py-2 px-4 sm:px-6 font-medium text-sm sm:text-base"
@@ -849,26 +781,219 @@ export function BranchCommerce({
         !isSurveysView &&
         !isStudiesView &&
         !isPromotionsView && (
-          <div className="container mx-auto my-8">
-            <TablaItem
-              data={data}
-              columns={columns}
-              title={`Sucursales de ${selectedCompanyName}`}
-              buttonLabel="Agregar Sucursal"
-              onButtonClick={onButtonClick}
-              showBackButton={true}
-              onBackClick={onBackClick}
-            />
+          <div className="p-4 sm:p-6 md:p-8 rounded-lg bg-white-translucent dark:bg-boxdark">
+            {/* Header Section */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+              <div>
+                <h2 className="text-xl md:text-2xl font-bold text-gray-800 dark:text-white">
+                  {`Sucursales de ${selectedCompanyName}`}
+                </h2>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={onButtonClick}
+                  className="px-4 py-2 bg-primary dark:bg-blue-600 text-white rounded font-medium hover:bg-opacity-90 transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={!canCreateBranch}
+                >
+                  Agregar Sucursal
+                </button>
+              </div>
+            </div>
+
+            {/* No Data or Loading State */}
+            {data.length === 0 && !isLoading && (
+              <div className="bg-white dark:bg-gray-900 p-6 rounded-lg border border-gray-100 dark:border-gray-800 text-center">
+                <p className="text-gray-500 dark:text-gray-400 text-lg">
+                  No hay sucursales disponibles para mostrar.
+                </p>
+              </div>
+            )}
+            {isLoading ? (
+              <div className="text-center py-10">
+                <LoadingDots />
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                {data.map((row) => (
+                  <div
+                    key={row.id}
+                    className="p-4 sm:p-3 rounded-lg border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm transform transition-all duration-300"
+                  >
+                    <div
+                      className={`relative w-full min-h-[300px] perspective-1000 transform-style-3d ${
+                        isFlipped[row.id] ? "flip" : ""
+                      }`}
+                    >
+                      {/* Cara frontal */}
+                      <div className="absolute w-full h-full backface-hidden">
+                        <div className="flex items-center justify-between mb-4 min-h-[60px]">
+                          <div className="flex items-center w-full">
+                            <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mr-4 min-w-[48px]">
+                              <Icon
+                                icon="mdi:store"
+                                className="text-blue-500 dark:text-blue-400"
+                                width="24"
+                                height="24"
+                              />
+                            </div>
+                            <h3 className="text-lg font-semibold text-gray-800 dark:text-white line-clamp-2 break-words">
+                              {row.item}
+                            </h3>
+                          </div>
+                          <div className="flex items-center min-w-[40px]">
+                            <button
+                              onClick={() => onEdit(row)}
+                              className="flex items-center justify-center w-8 h-8 bg-gray-400 dark:bg-gray-700 rounded-lg transition-all duration-300 hover:bg-[#3B82F6] dark:hover:bg-[#3B82F6]"
+                              aria-label="Editar"
+                            >
+                              <Icon
+                                icon="fa:edit"
+                                className="text-white"
+                                width="16"
+                                height="16"
+                              />
+                            </button>
+                          </div>
+                        </div>
+                        <p className="text-gray-600 dark:text-gray-300 truncate overflow-hidden whitespace-nowrap">
+                          Dirección:
+                        </p>
+                        <p className="text-gray-600 dark:text-gray-300 mb-3 truncate overflow-hidden whitespace-nowrap">
+                          {row.address}
+                        </p>
+
+                        <p className="text-gray-600 dark:text-gray-300 mb-3">
+                          Contacto: {row.contact}
+                        </p>
+                        <span
+                          className={
+                            row.status === "Activo"
+                              ? "inline-block bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-3 py-1 rounded-full text-sm font-medium"
+                              : "inline-block bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 px-3 py-1 rounded-full text-sm font-medium"
+                          }
+                        >
+                          {row.status}
+                        </span>
+                        <div
+                          onClick={() => handleFlip(row.id)}
+                          className="flex justify-start mb-4 mt-4 w-full cursor-pointer p-[10px] pulso pulse-glow"
+                        >
+                          <span className="bg-blue-500 font-medium dark:bg-blue-600 text-white text-base w-full text-center cursor-pointer ">
+                            Mis Herramientas Smart
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Cara trasera */}
+                      <div className="absolute w-full h-full backface-hidden rotate-y-180">
+                        <div className="flex flex-col items-center justify-center h-full p-4 rounded-lg">
+                          <div className="grid grid-cols-2 gap-4 w-full">
+                            <button
+                              onClick={() => onSur(row)}
+                              className="flex flex-col items-center bg-white dark:bg-gray-700 rounded-lg p-3 transition-all duration-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                              aria-label="Encuestas"
+                            >
+                              <div className="w-10 h-10 flex items-center justify-center bg-[#81C784] rounded-full">
+                                <Icon
+                                  icon="wpf:survey"
+                                  className="text-white"
+                                  width="20"
+                                  height="20"
+                                />
+                              </div>
+                              <span className="mt-2 text-xs text-gray-900 dark:text-gray-100 font-medium text-center">
+                                Encuestas
+                              </span>
+                            </button>
+                            <button
+                              onClick={() => onStud(row)}
+                              className="flex flex-col items-center bg-white dark:bg-gray-700 rounded-lg p-3 transition-all duration-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                              aria-label="Estudios de Mercado"
+                            >
+                              <div className="w-10 h-10 flex items-center justify-center bg-[#9575CD] rounded-full">
+                                <img
+                                  src={iconEstuMercado}
+                                  alt="Estudios de Mercado"
+                                  className="w-5 h-5"
+                                />
+                              </div>
+                              <span className="mt-2 text-xs text-gray-900 dark:text-gray-100 font-medium text-center">
+                                E. Mercado
+                              </span>
+                            </button>
+                            <button
+                              onClick={() => onPro(row)}
+                              className="hidden flex-col items-center bg-white dark:bg-gray-700 rounded-lg p-3 transition-all duration-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                              aria-label="Promociones Smart"
+                            >
+                              <div className="w-10 h-10 flex items-center justify-center bg-[#b375cd] rounded-full">
+                                <img
+                                  src={iconPromotions}
+                                  alt="Promociones Smart"
+                                  className="w-5 h-5"
+                                />
+                              </div>
+                              <span className="mt-2 text-xs text-gray-900 dark:text-gray-100 font-medium text-center">
+                                Promociones
+                              </span>
+                            </button>
+                            <button
+                              onClick={() => onProd(row)}
+                              className="flex flex-col items-center bg-white dark:bg-gray-700 rounded-lg p-3 transition-all duration-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                              aria-label="Productos"
+                            >
+                              <div className="w-10 h-10 flex items-center justify-center bg-[#64B5F6] rounded-full">
+                                <Icon
+                                  icon="dashicons:products"
+                                  className="text-white"
+                                  width="20"
+                                  height="20"
+                                />
+                              </div>
+                              <span className="mt-2 text-xs text-gray-900 dark:text-gray-100 font-medium text-center">
+                                Productos
+                              </span>
+                            </button>
+                          </div>
+                          <button
+                            onClick={() => handleFlip(row.id)}
+                            className="mt-4 bg-blue-500 text-white px-4 py-2 rounded"
+                          >
+                            Volver
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {onBackClick && (
+              <div className="mt-6 flex justify-start">
+                <button
+                  onClick={onBackClick}
+                  className="flex items-center gap-2 px-4 py-2 text-sm text-blue-500 dark:text-blue-400 border border-blue-500 dark:border-blue-400 rounded font-medium hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors duration-300"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  <span>Volver</span>
+                </button>
+                <i
+                  className="fas fa-chevron-left text-white bg-[#1c2434] p-2 rounded-full flex items-center justify-center w-8 h-8 cursor-pointer"
+                  onClick={onBackClick}
+                  aria-label="Volver"
+                ></i>
+              </div>
+            )}
           </div>
         )}
       {isProductView && (
         <ProductsCommerce
-          selectedBranchName={selectedBranchName}
-          branchId={selectedBranchId}
-          branchAddress={selectedBranchAddress}
-          onBackClick={handleBackToTrade}
+          selectedBranchName={selectedBranchName} //sucursal
+          branchId={selectedBranchId} // branch_id
+          branchAddress={selectedBranchAddress} //direccion
           inheritedCategory={selectedCategory}
           inheritedSubcategory={selectedSubcategory}
+          onBackClick={handleBackToTrade}
         />
       )}
       {isSurveysView && (
@@ -888,20 +1013,14 @@ export function BranchCommerce({
         />
       )}
       {isPromotionsView && (
-        <>
-          {console.log("Coordenadas enviadas a PromotionsCommerce:", {
-            latitud,
-            longitud,
-          })}
-          <PromotionsCommerce
-            selectedBranchName={selectedBranchName}
-            branchId={selectedBranchId}
-            branchAddress={selectedBranchAddress}
-            onBackClick={handleBackToTrade}
-            latitud={latitud}
-            longitud={longitud}
-          />
-        </>
+        <PromotionsCommerce
+          selectedBranchName={selectedBranchName}
+          branchId={selectedBranchId}
+          branchAddress={selectedBranchAddress}
+          onBackClick={handleBackToTrade}
+          latitud={latitud}
+          longitud={longitud}
+        />
       )}
     </>
   );

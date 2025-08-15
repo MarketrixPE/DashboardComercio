@@ -1,7 +1,15 @@
 import { useState, useEffect } from "react";
 import { HelperService } from "../../core/services/HelperService";
-import { getPointsMetrics, getCouponsMetrics, getPromotionsMetrics, getSurveysMetrics, getMarketStudiesMetrics, getMetricsTrend } from "../../core/services/Operador/Metrics/MetricsService";
-
+import {
+  getPointsMetrics,
+  getCouponsMetrics,
+  getPromotionsMetrics,
+  getSurveysMetrics,
+  getMarketStudiesMetrics,
+  getMetricsTrend,
+  getPointsGainedAndLostTrend,
+} from "../../core/services/Operador/Metrics/MetricsService";
+import { getBranchesByCompanyId } from "../../core/services/Operador/Branch/BranchService";
 
 interface GrowthIndicator {
   value: number;
@@ -47,6 +55,12 @@ interface PointsTrendItem {
   total_points: number;
 }
 
+interface PointsGainedLostTrend {
+  date: string;
+  points_gained: number;
+  points_lost: number;
+}
+
 interface CouponsTrendItem {
   date: string;
   total_coupons: number;
@@ -89,6 +103,11 @@ export const TIME_FRAMES = {
 
 export type TimeFrameType = (typeof TIME_FRAMES)[keyof typeof TIME_FRAMES];
 
+interface Branch {
+  uuid: string;
+  descripcion: string;
+}
+
 interface UseMetricsReturn {
   timeFrame: TimeFrameType;
   setTimeFrame: (value: TimeFrameType) => void;
@@ -98,8 +117,16 @@ interface UseMetricsReturn {
     categories: string[];
   };
   pointsTrendData: PointsTrendItem[];
-  comparisonMetric: "points" | "coupons" | "promotions" | "surveys" | "marketStudies";
-  setComparisonMetric: (value: "points" | "coupons" | "promotions" | "surveys" | "marketStudies") => void;
+  pointsGainedLostTrend: PointsGainedLostTrend[];
+  comparisonMetric:
+    | "points"
+    | "coupons"
+    | "promotions"
+    | "surveys"
+    | "marketStudies";
+  setComparisonMetric: (
+    value: "points" | "coupons" | "promotions" | "surveys" | "marketStudies"
+  ) => void;
   showCompareModal: boolean;
   setShowCompareModal: (value: boolean) => void;
   compareTimeFrame1: TimeFrameType;
@@ -108,17 +135,26 @@ interface UseMetricsReturn {
   setCompareTimeFrame2: (value: TimeFrameType) => void;
   range1Data: any[];
   range2Data: any[];
+  branches: Branch[];
+  selectedBranch: string;
+  setSelectedBranch: (value: string) => void;
 }
 
 export const useMetrics = (): UseMetricsReturn => {
-  const uuid = HelperService.getUserUuid();
+  const commerceUuid = HelperService.getUserUuid();
+  const encryptedCompanyId = HelperService.getCompanyId() || "";
   const [timeFrame, setTimeFrame] = useState<TimeFrameType>(TIME_FRAMES.TODAY);
-  const [comparisonMetric, setComparisonMetric] = useState<"points" | "coupons" | "promotions" | "surveys" | "marketStudies">("marketStudies");
+  const [comparisonMetric, setComparisonMetric] = useState<
+    "points" | "coupons" | "promotions" | "surveys" | "marketStudies"
+  >("marketStudies");
   const [chartData, setChartData] = useState<{
     series: Array<{ name: string; data: number[] }>;
     categories: string[];
   }>({ series: [], categories: [] });
   const [pointsTrendData, setPointsTrendData] = useState<PointsTrendItem[]>([]);
+  const [pointsGainedLostTrend, setPointsGainedLostTrend] = useState<
+    PointsGainedLostTrend[]
+  >([]);
   const [metrics, setMetrics] = useState<Metrics>({
     points: {
       count: 0,
@@ -152,21 +188,45 @@ export const useMetrics = (): UseMetricsReturn => {
     },
   });
   const [showCompareModal, setShowCompareModal] = useState(false);
-  const [compareTimeFrame1, setCompareTimeFrame1] = useState<TimeFrameType>(TIME_FRAMES.TODAY);
-  const [compareTimeFrame2, setCompareTimeFrame2] = useState<TimeFrameType>(TIME_FRAMES.LAST_MONTH);
+  const [compareTimeFrame1, setCompareTimeFrame1] = useState<TimeFrameType>(
+    TIME_FRAMES.TODAY
+  );
+  const [compareTimeFrame2, setCompareTimeFrame2] = useState<TimeFrameType>(
+    TIME_FRAMES.LAST_MONTH
+  );
   const [range1Data, setRange1Data] = useState<any[]>([]);
   const [range2Data, setRange2Data] = useState<any[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [selectedBranch, setSelectedBranch] = useState<string>("");
+
+  const uuid = selectedBranch || commerceUuid;
+
+  useEffect(() => {
+    const fetchBranches = async () => {
+      try {
+        const companyBranches = await getBranchesByCompanyId(
+          encryptedCompanyId
+        );
+        setBranches(companyBranches);
+      } catch (error) {
+        console.error("Error fetching branches:", error);
+      }
+    };
+    fetchBranches();
+  }, [encryptedCompanyId]);
 
   const fetchMetrics = async () => {
     try {
       const params = { uuid, timeFrame };
-      const [points, coupons, promotions, surveys, marketStudies] = await Promise.all([
-        getPointsMetrics(params),
-        getCouponsMetrics(params),
-        getPromotionsMetrics(params),
-        getSurveysMetrics(params),
-        getMarketStudiesMetrics(params),
-      ]);
+      console.log("Parámetros enviados a fetchMetrics:", params);
+      const [points, coupons, promotions, surveys, marketStudies] =
+        await Promise.all([
+          getPointsMetrics(params),
+          getCouponsMetrics(params),
+          getPromotionsMetrics(params),
+          getSurveysMetrics(params),
+          getMarketStudiesMetrics(params),
+        ]);
 
       setMetrics({
         points: {
@@ -208,95 +268,144 @@ export const useMetrics = (): UseMetricsReturn => {
   const processTrendDataForChart = (trendData: TrendData) => {
     const { coupons_trend, promotions_trend, surveys_trend, market_studies_trend } = trendData;
 
-    const allDates = new Set([
-      ...coupons_trend.map((item) => item.date.split(" ")[0]),
-      ...promotions_trend.map((item) => item.date.split(" ")[0]),
-      ...surveys_trend.map((item) => item.date.split(" ")[0]),
-      ...market_studies_trend.map((item) => item.date.split(" ")[0]),
-    ]);
+    // Agrupar por hora o fecha según el timeFrame
+    const groupByTimeUnit = (data: { date: string; value: number }[], timeFrame: string) => {
+      const grouped = data.reduce((acc, item) => {
+        const date = new Date(item.date);
+        let key;
+        switch (timeFrame) {
+          case TIME_FRAMES.TODAY:
+          case TIME_FRAMES.YESTERDAY:
+            key = date.toLocaleTimeString("es-ES", { 
+              hour: "2-digit", 
+              hour12: true, 
+              timeZone: "America/Bogota" 
+            });
+            break;
+          case TIME_FRAMES.LAST_7_DAYS:
+            key = date.toLocaleDateString("es-ES", { weekday: "short" });
+            break;
+          case TIME_FRAMES.CURRENT_MONTH:
+          case TIME_FRAMES.LAST_MONTH:
+            key = date.toLocaleDateString("es-ES", { day: "2-digit" });
+            break;
+          case TIME_FRAMES.CURRENT_YEAR:
+            key = date.toLocaleDateString("es-ES", { month: "short" });
+            break;
+          default:
+            key = date.toLocaleDateString("es-ES", { day: "2-digit", month: "short" });
+        }
+        acc[key] = (acc[key] || 0) + item.value;
+        return acc;
+      }, {} as Record<string, number>);
 
-    const sortedDates = Array.from(allDates).sort();
+      return grouped;
+    };
 
-    const surveysData = sortedDates.map(
-      (date) => surveys_trend.find((item) => item.date.startsWith(date))?.total_surveys || 0
+    const promotionsDataByTime = groupByTimeUnit(
+      promotions_trend.map(item => ({ date: item.date, value: item.total_promotions })),
+      trendData.timeFrame
     );
-    const promotionsData = sortedDates.map(
-      (date) => promotions_trend.find((item) => item.date.startsWith(date))?.total_promotions || 0
+    const surveysDataByTime = groupByTimeUnit(
+      surveys_trend.map(item => ({ date: item.date, value: item.total_surveys })),
+      trendData.timeFrame
     );
-    const couponsData = sortedDates.map(
-      (date) => coupons_trend.find((item) => item.date.startsWith(date))?.total_coupons || 0
+    const couponsDataByTime = groupByTimeUnit(
+      coupons_trend.map(item => ({ date: item.date, value: item.total_coupons })),
+      trendData.timeFrame
     );
-    const marketStudiesData = sortedDates.map(
-      (date) => market_studies_trend.find((item) => item.date.startsWith(date))?.total_market_studies || 0
+    const marketStudiesDataByTime = groupByTimeUnit(
+      market_studies_trend.map(item => ({ date: item.date, value: item.total_market_studies })),
+      trendData.timeFrame
     );
 
-    const formattedDates = sortedDates.map((date) => {
-      const dateObj = new Date(date);
-      switch (timeFrame) {
-        case TIME_FRAMES.TODAY:
-        case TIME_FRAMES.YESTERDAY:
-          return dateObj.toLocaleTimeString("es-ES", { hour: "2-digit" });
-        case TIME_FRAMES.LAST_7_DAYS:
-          return dateObj.toLocaleDateString("es-ES", { weekday: "short" });
-        case TIME_FRAMES.CURRENT_MONTH:
-        case TIME_FRAMES.LAST_MONTH:
-          return dateObj.toLocaleDateString("es-ES", { day: "2-digit" });
-        case TIME_FRAMES.CURRENT_YEAR:
-          return dateObj.toLocaleDateString("es-ES", { month: "short" });
-        default:
-          return dateObj.toLocaleDateString("es-ES", { day: "2-digit", month: "short" });
-      }
-    });
+    const allTimeUnits = Array.from(new Set([
+      ...Object.keys(promotionsDataByTime),
+      ...Object.keys(surveysDataByTime),
+      ...Object.keys(couponsDataByTime),
+      ...Object.keys(marketStudiesDataByTime),
+    ])).sort();
+
+    const formattedTimeUnits = allTimeUnits;
 
     setChartData({
       series: [
-        { name: "Encuestas Completadas", data: surveysData },
-        { name: "Estudios de Mercado", data: marketStudiesData },
-        { name: "Promociones Activas", data: promotionsData },
-        { name: "Cupones Canjeados", data: couponsData },
+        { name: "Encuestas Completadas", data: allTimeUnits.map(t => surveysDataByTime[t] || 0) },
+        { name: "Estudios de Mercado", data: allTimeUnits.map(t => marketStudiesDataByTime[t] || 0) },
+        { name: "Promociones Lanzadas", data: allTimeUnits.map(t => promotionsDataByTime[t] || 0) },
+        { name: "Cupones Canjeados", data: allTimeUnits.map(t => couponsDataByTime[t] || 0) },
       ],
-      categories: formattedDates,
+      categories: formattedTimeUnits,
     });
   };
 
   const fetchTrendData = async () => {
     try {
       const params = { uuid, timeFrame };
+      console.log("Parámetros enviados a fetchTrendData:", params);
       const trendData = await getMetricsTrend(params);
       processTrendDataForChart(trendData);
 
       if (trendData.points_trend) {
         setPointsTrendData(
-          trendData.points_trend.map((point: { date: any; total_points: any }) => ({
-            date: point.date,
-            total_points: point.total_points,
-          }))
+          trendData.points_trend.map(
+            (point: { date: any; total_points: any }) => ({
+              date: point.date,
+              total_points: point.total_points,
+            })
+          )
         );
       }
+
+      const gainedLostTrend = await getPointsGainedAndLostTrend(params);
+      setPointsGainedLostTrend(gainedLostTrend.trend || []);
     } catch (error) {
       console.error("Error al obtener datos para los gráficos:", error);
+      setPointsGainedLostTrend([]);
     }
   };
 
   const fetchComparisonData = async () => {
     try {
-      const fetchFunction = {
-        points: getPointsMetrics,
-        coupons: getCouponsMetrics,
-        promotions: getPromotionsMetrics,
-        surveys: getSurveysMetrics,
-        marketStudies: getMarketStudiesMetrics,
-      }[comparisonMetric];
+      let data1, data2;
 
       const params1 = { uuid, timeFrame: compareTimeFrame1 };
-      const data1 = await fetchFunction(params1);
-      setRange1Data(data1.trend || []);
-
       const params2 = { uuid, timeFrame: compareTimeFrame2 };
-      const data2 = await fetchFunction(params2);
-      setRange2Data(data2.trend || []);
+
+      console.log(
+        "Parámetros enviados a fetchComparisonData (range1):",
+        params1
+      );
+      console.log(
+        "Parámetros enviados a fetchComparisonData (range2):",
+        params2
+      );
+
+      if (comparisonMetric === "points") {
+        [data1, data2] = await Promise.all([
+          getPointsGainedAndLostTrend(params1),
+          getPointsGainedAndLostTrend(params2),
+        ]);
+        setRange1Data(data1.trend || []);
+        setRange2Data(data2.trend || []);
+      } else {
+        const fetchFunction = {
+          points: getPointsMetrics,
+          coupons: getCouponsMetrics,
+          promotions: getPromotionsMetrics,
+          surveys: getSurveysMetrics,
+          marketStudies: getMarketStudiesMetrics,
+        }[comparisonMetric];
+
+        [data1, data2] = await Promise.all([
+          fetchFunction(params1),
+          fetchFunction(params2),
+        ]);
+        setRange1Data(data1.trend || []);
+        setRange2Data(data2.trend || []);
+      }
     } catch (error) {
-      console.error("Error fetching metrics:", error);
+      console.error("Error fetching comparison data:", error);
     }
   };
 
@@ -304,12 +413,23 @@ export const useMetrics = (): UseMetricsReturn => {
     if (showCompareModal) {
       fetchComparisonData();
     }
-  }, [showCompareModal, compareTimeFrame1, compareTimeFrame2]);
+  }, [
+    showCompareModal,
+    compareTimeFrame1,
+    compareTimeFrame2,
+    comparisonMetric,
+    uuid,
+  ]);
 
   useEffect(() => {
     fetchMetrics();
     fetchTrendData();
-  }, [timeFrame]);
+    const intervalId = setInterval(() => {
+      fetchMetrics();
+      fetchTrendData();
+    }, 30000);
+    return () => clearInterval(intervalId);
+  }, [timeFrame, uuid]);
 
   return {
     timeFrame,
@@ -317,6 +437,7 @@ export const useMetrics = (): UseMetricsReturn => {
     metrics,
     chartData,
     pointsTrendData,
+    pointsGainedLostTrend,
     comparisonMetric,
     setComparisonMetric,
     showCompareModal,
@@ -327,5 +448,8 @@ export const useMetrics = (): UseMetricsReturn => {
     setCompareTimeFrame2,
     range1Data,
     range2Data,
+    branches,
+    selectedBranch,
+    setSelectedBranch,
   };
 };

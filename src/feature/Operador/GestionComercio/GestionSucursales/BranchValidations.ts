@@ -54,7 +54,7 @@ export const branchValidations = {
       return "El logo es requerido";
     }
     if (logo instanceof File) {  // Verificamos que sea un archivo
-      const maxSize = 10; // 10MB
+      const maxSize = 100; // 10MB
       if (logo.size > maxSize * 1024 * 1024) {
         return `El logo no debe superar los ${maxSize}MB`;
       }

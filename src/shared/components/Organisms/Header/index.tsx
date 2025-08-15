@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import DropdownUser from "./DropdownUser";
 import DarkModeSwitcher from "./DarkModeSwitcher";
 import AnimatedCss from "../../Atoms/Animated/Animated";
+import DropdownNotification from "./DropdownNotification";
 
 const Header = (props: {
   sidebarOpen: string | boolean | undefined;
@@ -60,7 +61,7 @@ const Header = (props: {
               to="/puntos-smart"
             >
               <img
-                src="https://servicios.puntossmart.com/img/LogoIcon.svg"
+                src="https://api-dashboard.puntossmart.com/img/LogoIcon.svg"
                 alt="Logo"
               />
             </Link>
@@ -109,7 +110,7 @@ const Header = (props: {
               {/* <!-- Dark Mode Toggler --> */}
 
               {/* <!-- Notification Menu Area --> */}
-              {/* <DropdownNotification /> */}
+              <DropdownNotification />
               {/* <!-- Notification Menu Area --> */}
 
               {/* <!-- Chat Notification Area --> */}

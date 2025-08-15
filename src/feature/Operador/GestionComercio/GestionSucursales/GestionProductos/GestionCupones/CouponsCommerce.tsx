@@ -468,7 +468,7 @@ const CouponsCommerce = ({
                   setCouponForm((prev) => ({ ...prev, imagen: file }))
                 }
                 accept="image/jpeg, image/jpg, image/png"
-                maxSize={10 * 1024 * 1024}
+                maxSize={100 * 1024 * 1024}
                 label="Haga click para cargar o arrastrar y soltar"
                 initialPreview={
                   isEditing && imagePreview ? imagePreview : undefined

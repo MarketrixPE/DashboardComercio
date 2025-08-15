@@ -8,9 +8,17 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL_COMMERCE;
  */
 const handleApiError = (error: any, defaultMessage: string): never => {
   let errorMessage = defaultMessage;
+
+  const errorMessages: { [key: string]: string } = {
+    "The email has already been taken.":
+      "El correo electrónico ya está en uso.",
+  };
+
   if (error instanceof AxiosError && error.response) {
-    errorMessage = error.response.data?.message || defaultMessage;
+    const apiError = error.response.data?.error;
+    errorMessage = errorMessages[apiError] || apiError || defaultMessage;
   }
+
   console.error(errorMessage);
   throw new Error(errorMessage);
 };
@@ -28,14 +36,17 @@ export const getUsersOfCompany = async (companyId: string) => {
       `${API_BASE_URL}/users/company/workers`,
       { company_id: companyId }
     );
-    
+
     if (data.success !== false) {
       return data;
     }
-    
+
     throw new Error("No se encontraron trabajadores para esta compañía.");
   } catch (error) {
-    return handleApiError(error, "Error al obtener los trabajadores de la compañía.");
+    return handleApiError(
+      error,
+      "Error al obtener los trabajadores de la compañía."
+    );
   }
 };
 
@@ -52,14 +63,17 @@ export const getBranchWorkers = async (branchId: string) => {
       `${API_BASE_URL}/users/branch/workers`,
       { branch_uuid: branchId }
     );
-    
+
     if (data.success !== false) {
       return data;
     }
-    
+
     throw new Error("No se encontraron trabajadores para esta sucursal.");
   } catch (error) {
-    return handleApiError(error, "Error al obtener los trabajadores de la sucursal.");
+    return handleApiError(
+      error,
+      "Error al obtener los trabajadores de la sucursal."
+    );
   }
 };
 
@@ -72,15 +86,14 @@ export const getUserDetails = async (uuid: string) => {
   }
 
   try {
-    const { data } = await commerceClient.post(
-      `${API_BASE_URL}/users/show`,
-      { uuid }
-    );
-    
+    const { data } = await commerceClient.post(`${API_BASE_URL}/users/show`, {
+      uuid,
+    });
+
     if (data.success !== false) {
       return data;
     }
-    
+
     throw new Error("No se encontró el usuario solicitado.");
   } catch (error) {
     return handleApiError(error, "Error al obtener los detalles del usuario.");
@@ -100,10 +113,20 @@ export const createUser = async (userData: {
   company_id: string;
 }) => {
   // Validar que los campos requeridos estén presentes
-  const requiredFields = ['name', 'last_name', 'email', 'password', 'role', 'branch_id', 'company_id'];
+  const requiredFields = [
+    "name",
+    "last_name",
+    "email",
+    "password",
+    "role",
+    "branch_id",
+    "company_id",
+  ];
   for (const field of requiredFields) {
     if (!userData[field as keyof typeof userData]) {
-      throw new Error(`El campo ${field} es obligatorio para crear un usuario.`);
+      throw new Error(
+        `El campo ${field} es obligatorio para crear un usuario.`
+      );
     }
   }
 
@@ -116,18 +139,18 @@ export const createUser = async (userData: {
       password: String(userData.password),
       role: Number(userData.role),
       branch_id: String(userData.branch_id),
-      company_id: String(userData.company_id)
+      company_id: String(userData.company_id),
     };
 
     const { data } = await commerceClient.post(
       `${API_BASE_URL}/users/store`,
       sanitizedUserData
     );
-    
+
     if (data.success !== false) {
       return data;
     }
-    
+
     throw new Error("No se pudo crear el usuario.");
   } catch (error) {
     return handleApiError(error, "Error al crear el usuario.");
@@ -147,16 +170,20 @@ export const getCompanyBranches = async (companyId: string) => {
       `${API_BASE_URL}/branch/company`,
       { company_id: companyId }
     );
-    
+
     if (data.status === "success" && data.data) {
       return data.data;
     }
-    
+
     throw new Error("No se encontraron sucursales para esta compañía.");
   } catch (error) {
-    return handleApiError(error, "Error al obtener las sucursales de la compañía.");
+    return handleApiError(
+      error,
+      "Error al obtener las sucursales de la compañía."
+    );
   }
 };
+
 export const updateUser = async (
   uuid: string,
   userData: {
@@ -184,11 +211,11 @@ export const updateUser = async (
       `${API_BASE_URL}/users/update/${uuid}`,
       filteredUserData
     );
-    
+
     if (data.success !== false) {
       return data;
     }
-    
+
     throw new Error("No se pudo actualizar el usuario.");
   } catch (error) {
     return handleApiError(error, "Error al actualizar el usuario.");

@@ -84,8 +84,8 @@ export const studiesValidations = {
       return "Debe haber al menos una pregunta en el estudio";
     }
 
-    if (activeQuestions.length > 4) {
-      return "No pueden haber más de 4 preguntas en el estudio";
+    if (activeQuestions.length > 10) {
+      return "No pueden haber más de 10 preguntas en el estudio";
     }
 
     for (const question of activeQuestions) {

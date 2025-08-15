@@ -4,9 +4,9 @@ const ImageCarousel = () => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   
   const images = [
-    "https://servicios.puntossmart.com/img/Stadistica.png",
-    "https://servicios.puntossmart.com/img/Stadistica2.png",
-    "https://servicios.puntossmart.com/img/Stadistica3.png"
+    "https://api-dashboard.puntossmart.com/img/Stadistica.png",
+    "https://api-dashboard.puntossmart.com/img/Stadistica2.png",
+    "https://api-dashboard.puntossmart.com/img/Stadistica3.png"
   ];
 
   useEffect(() => {

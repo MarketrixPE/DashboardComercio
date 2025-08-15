@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import ClickOutside from "../../Atoms/ClickOutside";
 import UserPlaceholder from "../../../../assets/images/user/user-01.png";
 import { logout } from "../../../../core/services/AuthService";
+import Cookies from "js-cookie";
 
 const DropdownUser = () => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -22,28 +23,27 @@ const DropdownUser = () => {
 
   useEffect(() => {
     // Verificar primero el rol del usuario
-    const userRole = localStorage.getItem("user_role") || "0";
+    const userRole = Cookies.get("user_role") || "0";
 
     // Determinar el tipo de usuario basado en el rol
     const userType = userRole === "3" ? "branch_manager" : "commerce";
 
     // Obtener los datos correspondientes según el tipo de usuario
-    const name = localStorage.getItem(`${userType}_name`) || "Usuario";
-    const lastName = localStorage.getItem(`${userType}_last_name`) || "";
-    const avatar =
-      localStorage.getItem(`${userType}_avatar`) || UserPlaceholder;
+    const name = Cookies.get(`${userType}_name`) || "Usuario";
+    const lastName = Cookies.get(`${userType}_last_name`) || "";
+    const avatar = Cookies.get(`${userType}_avatar`) || UserPlaceholder;
 
     setUserData({ name, lastName, role: userRole, avatar, userType });
   }, []);
 
   const handleLogout = async () => {
     try {
-      // Usar el tipo de usuario correcto para el logout
       await logout(userData.userType);
     } catch (error) {
       console.error("Error al cerrar sesión:", error);
     }
   };
+  const navigate = useNavigate();
 
   // Determinar el texto del rol basado en el valor de `role`
   const getRoleText = () => {
@@ -55,13 +55,6 @@ const DropdownUser = () => {
       default:
         return "Usuario";
     }
-  };
-
-  // Obtener el perfil URL según el tipo de usuario
-  const getProfileUrl = () => {
-    return userData.userType === "branch_manager"
-      ? "/perfil-sucursal"
-      : "/settings-commerce";
   };
 
   return (
@@ -108,67 +101,39 @@ const DropdownUser = () => {
         <div
           className={`absolute right-0 mt-4 flex w-62.5 flex-col rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark`}
         >
-          <ul className="flex flex-col gap-5 border-b border-stroke px-6 py-7.5 dark:border-strokedark">
-            <li>
-              <Link
-                to={getProfileUrl()}
-                className="flex items-center gap-3.5 text-sm font-medium duration-300 ease-in-out hover:text-primary lg:text-base"
-              >
-                <svg
-                  className="fill-current"
-                  width="22"
-                  height="22"
-                  viewBox="0 0 22 22"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M11 9.62499C8.42188 9.62499 6.35938 7.59687 6.35938 5.12187C6.35938 2.64687 8.42188 0.618744 11 0.618744C13.5781 0.618744 15.6406 2.64687 15.6406 5.12187C15.6406 7.59687 13.5781 9.62499 11 9.62499ZM11 2.16562C9.28125 2.16562 7.90625 3.50624 7.90625 5.12187C7.90625 6.73749 9.28125 8.07812 11 8.07812C12.7188 8.07812 14.0938 6.73749 14.0938 5.12187C14.0938 3.50624 12.7188 2.16562 11 2.16562Z"
-                    fill=""
-                  />
-                  <path
-                    d="M17.7719 21.4156H4.2281C3.5406 21.4156 2.9906 20.8656 2.9906 20.1781V17.0844C2.9906 13.7156 5.7406 10.9656 9.10935 10.9656H12.925C16.2937 10.9656 19.0437 13.7156 19.0437 17.0844V20.1781C19.0094 20.8312 18.4594 21.4156 17.7719 21.4156ZM4.53748 19.8687H17.4969V17.0844C17.4969 14.575 15.4344 12.5125 12.925 12.5125H9.07498C6.5656 12.5125 4.5031 14.575 4.5031 17.0844V19.8687H4.53748Z"
-                    fill=""
-                  />
-                </svg>
-                Mi perfil
-              </Link>
-            </li>
+          <button
+            className="flex items-center gap-3.5 px-6 py-4 text-sm font-medium duration-300 ease-in-out hover:text-primary lg:text-base"
+            onClick={() => navigate("/mi-comercio")}
+          >
+            <svg
+              className="fill-current"
+              width="22"
+              height="22"
+              viewBox="0 0 22 22"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <g id="SVGRepo_bgCarrier" stroke-width="0" />
 
-            {/* Opciones específicas según rol */}
-            {userData.userType === "branch_manager" && (
-              <li>
-                <Link
-                  to="/transacciones"
-                  className="flex items-center gap-3.5 text-sm font-medium duration-300 ease-in-out hover:text-primary lg:text-base"
-                >
-                  <svg
-                    className="fill-current"
-                    width="22"
-                    height="22"
-                    viewBox="0 0 22 22"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M21 5.25H3C2.59 5.25 2.25 4.91 2.25 4.5C2.25 4.09 2.59 3.75 3 3.75H21C21.41 3.75 21.75 4.09 21.75 4.5C21.75 4.91 21.41 5.25 21 5.25Z"
-                      fill=""
-                    />
-                    <path
-                      d="M10.65 16.5H3C2.59 16.5 2.25 16.16 2.25 15.75C2.25 15.34 2.59 15 3 15H10.65C11.06 15 11.4 15.34 11.4 15.75C11.4 16.16 11.06 16.5 10.65 16.5Z"
-                      fill=""
-                    />
-                    <path
-                      d="M21 10.875H3C2.59 10.875 2.25 10.535 2.25 10.125C2.25 9.715 2.59 9.375 3 9.375H21C21.41 9.375 21.75 9.715 21.75 10.125C21.75 10.535 21.41 10.875 21 10.875Z"
-                      fill=""
-                    />
-                  </svg>
-                  Transacciones
-                </Link>
-              </li>
-            )}
-          </ul>
+              <g
+                id="SVGRepo_tracerCarrier"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
 
+              <g id="SVGRepo_iconCarrier">
+                <path
+                  d="M3.77791 3.65484C3.59687 4.01573 3.50783 4.46093 3.32975 5.35133L2.73183 8.34093C2.35324 10.2339 3.8011 12 5.73155 12C7.30318 12 8.61911 10.8091 8.77549 9.24527L8.8445 8.55515C8.68141 10.4038 10.1385 12 11.9998 12C13.8737 12 15.338 10.382 15.1515 8.51737L15.2245 9.24527C15.3809 10.8091 16.6968 12 18.2685 12C20.1989 12 21.6468 10.2339 21.2682 8.34093L20.6703 5.35133C20.4922 4.46095 20.4031 4.01573 20.2221 3.65484C19.8406 2.89439 19.1542 2.33168 18.3337 2.10675C17.9443 2 17.4903 2 16.5823 2H14.4998H7.41771C6.50969 2 6.05567 2 5.66628 2.10675C4.84579 2.33168 4.15938 2.89439 3.77791 3.65484Z"
+                  fill=""
+                />
+                <path
+                  d="M18.2685 13.5C19.0856 13.5 19.8448 13.2876 20.5 12.9189V14C20.5 17.7712 20.5 19.6568 19.3284 20.8284C18.3853 21.7715 16.9796 21.9554 14.5 21.9913V18.5C14.5 17.5654 14.5 17.0981 14.299 16.75C14.1674 16.522 13.978 16.3326 13.75 16.201C13.4019 16 12.9346 16 12 16C11.0654 16 10.5981 16 10.25 16.201C10.022 16.3326 9.83261 16.522 9.70096 16.75C9.5 17.0981 9.5 17.5654 9.5 18.5V21.9913C7.02043 21.9554 5.61466 21.7715 4.67157 20.8284C3.5 19.6568 3.5 17.7712 3.5 14V12.9189C4.15524 13.2876 4.91439 13.5 5.73157 13.5C6.92864 13.5 8.02617 13.0364 8.84435 12.2719C9.67168 13.0321 10.7765 13.5 11.9998 13.5C13.2232 13.5 14.3281 13.032 15.1555 12.2717C15.9737 13.0363 17.0713 13.5 18.2685 13.5Z"
+                  fill=""
+                />
+              </g>
+            </svg>
+            Mi Comercio
+          </button>
           <button
             className="flex items-center gap-3.5 px-6 py-4 text-sm font-medium duration-300 ease-in-out hover:text-primary lg:text-base"
             onClick={handleLogout}

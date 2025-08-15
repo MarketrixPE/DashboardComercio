@@ -7,6 +7,7 @@ import {
   updateUser,
   createUser,
   getCompanyBranches,
+  getBranchWorkers,
 } from "../../../../core/services/UserService/UserService";
 import { LoadingDots } from "../../../../shared/components/Atoms/LoadingDots/LoadingDots";
 import TablaItem, {
@@ -27,7 +28,6 @@ function UserManagement() {
   const [name, setName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("+51");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [role, setRole] = useState<number>(4); // Default: Operador
@@ -37,23 +37,33 @@ function UserManagement() {
   // Control de carga inicial
   const hasFetchedUsers = useRef(false);
   const encryptedCompanyId = HelperService.getCompanyId();
+  const ManagerbranchId = HelperService.getBranchId();
+  const userRole = HelperService.getUserRole();
 
   const fetchData = async () => {
     setIsLoading(true);
 
     try {
-      if (!encryptedCompanyId) {
-        setData([]);
-        setShowButton(true);
-        Swal.fire({
-          icon: "info",
-          title: "No hay datos",
-          text: "No se encontró información de la compañía.",
-        });
-        return;
+      let response;
+
+      if (userRole === 3 && ManagerbranchId) {
+        response = await getBranchWorkers(ManagerbranchId);
+      } else if (userRole === 2) {
+        if (!encryptedCompanyId) {
+          setData([]);
+          setShowButton(true);
+          Swal.fire({
+            icon: "info",
+            title: "No hay datos",
+            text: "No se encontró información de la compañía.",
+          });
+          return;
+        }
+        response = await getUsersOfCompany(encryptedCompanyId);
+      } else {
+        throw new Error("Rol de usuario no válido o no autorizado.");
       }
 
-      const response = await getUsersOfCompany(encryptedCompanyId);
       if (!response || !response.workers || response.workers.length === 0) {
         setData([]);
         setShowButton(true);
@@ -71,7 +81,6 @@ function UserManagement() {
         name: worker.name,
         last_name: worker.last_name,
         email: worker.email,
-        phone: worker.phone || "",
         alias: worker.alias,
         rol_id: worker.rol_id,
         nombre_rol: worker.nombre_rol,
@@ -128,16 +137,6 @@ function UserManagement() {
       return false;
     }
 
-    // Validar teléfono
-    if (!phone || phone.length < 9) {
-      Swal.fire({
-        icon: "error",
-        title: "Error de validación",
-        text: "El número de teléfono debe tener al menos 9 dígitos.",
-      });
-      return false;
-    }
-
     // Validar contraseña solo en modo creación
     if (!isEditing) {
       if (!password || password.length < 8) {
@@ -164,7 +163,7 @@ function UserManagement() {
         text: "La contraseña debe tener al menos 8 caracteres.",
       });
       return false;
-    } else if (password !== confirmPassword) {
+    } else if (password && confirmPassword && password !== confirmPassword) {
       Swal.fire({
         icon: "error",
         title: "Error de validación",
@@ -173,8 +172,9 @@ function UserManagement() {
       return false;
     }
 
-    // Si el rol es Admin de Sucursal (3) o Operador (4), validar que se haya seleccionado una sucursal
-    if ((role === 3 || role === 4) && !branchId) {
+    // Validar sucursal para roles 3 o 4
+    const branchIdToUse = userRole === 3 ? ManagerbranchId : branchId;
+    if ((role === 3 || role === 4) && !branchIdToUse) {
       Swal.fire({
         icon: "error",
         title: "Error de validación",
@@ -193,33 +193,42 @@ function UserManagement() {
 
   const fetchBranches = async () => {
     try {
-      if (!encryptedCompanyId) {
-        throw new Error("No se encontró el ID de la compañía.");
+      if (userRole === 3 && ManagerbranchId) {
+        // Para gerentes de sucursal, usar ManagerbranchId
+        setBranches([
+          {
+            id: ManagerbranchId,
+            name: "Sucursal Actual", // Obtener el nombre real si está disponible
+          },
+        ]);
+        setBranchId(ManagerbranchId);
+      } else if (userRole === 2 && encryptedCompanyId) {
+        // Para gerentes de compañía, obtener todas las sucursales
+        const branchesData = await getCompanyBranches(encryptedCompanyId);
+
+        if (
+          !branchesData ||
+          !Array.isArray(branchesData) ||
+          branchesData.length === 0
+        ) {
+          setBranches([]);
+          console.warn("No se encontraron sucursales para esta compañía.");
+          return;
+        }
+
+        const formattedBranches = branchesData.map((branch) => ({
+          id: branch.uuid,
+          name: branch.descripcion || `Sucursal ${branch.uuid.slice(0, 6)}`,
+        }));
+
+        setBranches(formattedBranches);
+      } else {
+        throw new Error(
+          "No se encontró información de la compañía o sucursal."
+        );
       }
-
-      // Obtener sucursales de la API
-      const branchesData = await getCompanyBranches(encryptedCompanyId);
-
-      if (
-        !branchesData ||
-        !Array.isArray(branchesData) ||
-        branchesData.length === 0
-      ) {
-        setBranches([]);
-        console.warn("No se encontraron sucursales para esta compañía.");
-        return;
-      }
-
-      // Mapear los datos al formato que necesitamos
-      const formattedBranches = branchesData.map((branch) => ({
-        id: branch.uuid,
-        name: branch.descripcion || `Sucursal ${branch.uuid.slice(0, 6)}`,
-      }));
-
-      setBranches(formattedBranches);
     } catch (error) {
       console.error("Error al cargar sucursales:", error);
-      // Si falla, podemos usar datos de respaldo o mostrar un mensaje
       setBranches([]);
     }
   };
@@ -248,18 +257,11 @@ function UserManagement() {
       setName(user.name || "");
       setLastName(user.last_name || "");
       setEmail(user.email || "");
-      setPhone(user.phone || "+51");
-      setRole(user.role || 4);
+      setRole(userRole === 3 ? 4 : user.role || 4); // Fijar en Operador para gerentes de sucursal
       setStatus(user.status === undefined ? 1 : user.status);
-
-      // Si el usuario tiene sucursales asignadas, seleccionar la primera
-      if (user.branches && user.branches.length > 0) {
-        setBranchId(user.branches[0].id || "");
-      } else {
-        setBranchId("");
-      }
-
-      // Limpiar campos de contraseña en modo edición
+      setBranchId(
+        userRole === 3 ? ManagerbranchId : user.branches?.[0]?.id || ""
+      );
       setPassword("");
       setConfirmPassword("");
     } catch (error: any) {
@@ -279,13 +281,12 @@ function UserManagement() {
     setIsLoading(true);
 
     try {
+      const branchIdToUse = userRole === 3 ? ManagerbranchId : branchId;
       if (isEditing && currentUserId) {
-        // Preparar datos para actualización con tipos correctos
         const userData: {
           name?: string;
           last_name?: string;
           email?: string;
-          phone?: string;
           role?: number;
           status?: number;
           branch_id?: string;
@@ -295,19 +296,16 @@ function UserManagement() {
           name,
           last_name: lastName,
           email,
-          phone,
           role,
           status,
-          branch_id: branchId || undefined,
+          branch_id: branchIdToUse || undefined,
           company_id: encryptedCompanyId || null,
         };
 
-        // Agregar contraseña solo si se ha proporcionado una nueva
         if (password) {
           userData.password = password;
         }
 
-        // Actualizar usuario
         await updateUser(currentUserId, userData);
         Swal.fire(
           "Actualización exitosa",
@@ -315,7 +313,6 @@ function UserManagement() {
           "success"
         );
       } else {
-        // Crear nuevo usuario - asegurarse de tener todos los campos requeridos
         if (!password) {
           Swal.fire({
             icon: "error",
@@ -332,7 +329,7 @@ function UserManagement() {
           email,
           password,
           role,
-          branch_id: branchId,
+          branch_id: branchIdToUse,
           company_id: encryptedCompanyId || "",
         };
 
@@ -345,11 +342,11 @@ function UserManagement() {
       }
 
       setShowForm(false);
-      fetchData(); // Recargar la lista después de la operación
+      fetchData();
     } catch (error: any) {
       Swal.fire({
         icon: "error",
-        title: isEditing ? "Error al actualizar" : "Error al crear",
+        title: isEditing ? "Error al actualizar" : "Error",
         text: error.message || "Hubo un problema en la operación.",
       });
     } finally {
@@ -362,11 +359,10 @@ function UserManagement() {
     setName("");
     setLastName("");
     setEmail("");
-    setPhone("+51");
     setPassword("");
     setConfirmPassword("");
-    setRole(4); // Default: Operador
-    setBranchId("");
+    setRole(userRole === 3 ? 4 : 4); // Fijar en Operador para gerentes de sucursal
+    setBranchId(userRole === 3 ? ManagerbranchId : "");
     setStatus(1);
   };
 
@@ -381,7 +377,7 @@ function UserManagement() {
     if (!hasFetchedUsers.current) {
       hasFetchedUsers.current = true;
       fetchData();
-      fetchBranches(); // Cargar sucursales disponibles
+      fetchBranches();
     }
   }, []);
 
@@ -409,7 +405,6 @@ function UserManagement() {
       Cell: (row: RowData) => <span>{`${row.name} ${row.last_name}`}</span>,
     },
     { Header: "Email", accessor: "email" },
-    { Header: "Teléfono", accessor: "phone" },
     {
       Header: "Rol",
       accessor: "nombre_rol",
@@ -447,8 +442,6 @@ function UserManagement() {
     clearFormFields();
     setShowForm(true);
     setIsEditing(false);
-
-    // Cargar sucursales disponibles
     await fetchBranches();
   };
 
@@ -464,7 +457,13 @@ function UserManagement() {
                 onClick={handleCancelClick}
               ></i>
               <label className="text-base sm:text-lg md:text-title-md2 font-semibold text-black dark:text-white">
-                {isEditing ? "Editar Usuario" : "Agregar Usuario"}
+                {isEditing
+                  ? userRole === 3
+                    ? "Editar Operador"
+                    : "Editar Usuario"
+                  : userRole === 3
+                  ? "Agregar Operador"
+                  : "Agregar Usuario"}
               </label>
             </div>
 
@@ -501,39 +500,18 @@ function UserManagement() {
               </div>
             </div>
 
-            {/* Email y Teléfono */}
-            <div className="w-full flex flex-col sm:flex-row gap-4 sm:justify-between">
-              <div className="w-full sm:w-[49%]">
-                <label className="mb-2 sm:mb-3 block text-sm font-medium text-black dark:text-white">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  placeholder="Ingrese el email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded border border-stroke py-2 sm:py-3 px-4 sm:pl-3.5 sm:pr-4.5 dark:bg-boxdark dark:border-strokedark dark:text-white"
-                />
-              </div>
-              <div className="w-full sm:w-[49%]">
-                <label className="mb-2 sm:mb-3 block text-sm font-medium text-black dark:text-white">
-                  Teléfono
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ingrese el teléfono"
-                  value={phone}
-                  onChange={(e) => {
-                    const inputValue = e.target.value;
-                    if (!inputValue.startsWith("+51")) {
-                      setPhone("+51");
-                    } else {
-                      setPhone(inputValue);
-                    }
-                  }}
-                  className="w-full rounded border border-stroke py-2 sm:py-3 px-4 sm:pl-3.5 sm:pr-4.5 dark:bg-boxdark dark:border-strokedark dark:text-white"
-                />
-              </div>
+            {/* Email */}
+            <div className="w-full">
+              <label className="mb-2 sm:mb-3 block text-sm font-medium text-black dark:text-white">
+                Email
+              </label>
+              <input
+                type="email"
+                placeholder="Ingrese el email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full rounded border border-stroke py-2 sm:py-3 px-4 sm:pl-3.5 sm:pr-4.5 dark:bg-boxdark dark:border-strokedark dark:text-white"
+              />
             </div>
 
             {/* Contraseña y Confirmación */}
@@ -569,45 +547,47 @@ function UserManagement() {
             </div>
 
             {/* Rol y Sucursal */}
-            <div className="w-full flex flex-col sm:flex-row gap-4 sm:justify-between">
-              <div className="w-full sm:w-[49%]">
-                <label className="mb-2 sm:mb-3 block text-sm font-medium text-black dark:text-white">
-                  Rol
-                </label>
-                <select
-                  value={role}
-                  onChange={(e) => setRole(Number(e.target.value))}
-                  className="w-full rounded border border-stroke py-2 sm:py-3 px-4 sm:pl-3.5 sm:pr-4.5 dark:bg-boxdark dark:border-strokedark dark:text-white"
-                >
-                  <option value={3}>Admin de Sucursal</option>
-                  <option value={4}>Operador</option>
-                </select>
 
-                <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  <i className="fas fa-info-circle mr-1"></i>
-                  {role === 3
-                    ? "Máximo 1 Admin por sucursal"
-                    : "Máximo 2 Operadores por sucursal"}
+            {userRole !== 3 && (
+              <div className="w-full flex flex-col sm:flex-row gap-4 sm:justify-between">
+                <div className="w-full sm:w-[49%]">
+                  <label className="mb-2 sm:mb-3 block text-sm font-medium text-black dark:text-white">
+                    Rol
+                  </label>
+                  <select
+                    value={role}
+                    onChange={(e) => setRole(Number(e.target.value))}
+                    className="w-full rounded border border-stroke py-2 sm:py-3 px-4 sm:pl-3.5 sm:pr-4.5 dark:bg-boxdark dark:border-strokedark dark:text-white"
+                  >
+                    <option value={3}>Admin de Sucursal</option>
+                    <option value={4}>Operador</option>
+                  </select>
+                  <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    <i className="fas fa-info-circle mr-1"></i>
+                    {role === 3
+                      ? "Máximo 1 Admin por sucursal"
+                      : "Máximo 2 Operadores por sucursal"}
+                  </div>
+                </div>
+                <div className="w-full sm:w-[49%]">
+                  <label className="mb-2 sm:mb-3 block text-sm font-medium text-black dark:text-white">
+                    Sucursal
+                  </label>
+                  <select
+                    value={branchId}
+                    onChange={(e) => setBranchId(e.target.value)}
+                    className="w-full rounded border border-stroke py-2 sm:py-3 px-4 sm:pl-3.5 sm:pr-4.5 dark:bg-boxdark dark:border-strokedark dark:text-white"
+                  >
+                    <option value="">Seleccione una sucursal</option>
+                    {branches.map((branch) => (
+                      <option key={branch.id} value={branch.id}>
+                        {branch.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
-              <div className="w-full sm:w-[49%]">
-                <label className="mb-2 sm:mb-3 block text-sm font-medium text-black dark:text-white">
-                  Sucursal
-                </label>
-                <select
-                  value={branchId}
-                  onChange={(e) => setBranchId(e.target.value)}
-                  className="w-full rounded border border-stroke py-2 sm:py-3 px-4 sm:pl-3.5 sm:pr-4.5 dark:bg-boxdark dark:border-strokedark dark:text-white"
-                >
-                  <option value="">Seleccione una sucursal</option>
-                  {branches.map((branch) => (
-                    <option key={branch.id} value={branch.id}>
-                      {branch.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
+            )}
 
             {/* Estado (solo en modo edición) */}
             {isEditing && (
@@ -662,8 +642,12 @@ function UserManagement() {
           <TablaItem
             data={data}
             columns={columns}
-            title="Gestión de Usuarios"
-            buttonLabel="Agregar Usuario"
+            title={
+              userRole === 3 ? "Gestión de Operadores" : "Gestión de Usuarios"
+            }
+            buttonLabel={
+              userRole === 3 ? "Agregar Operador" : "Agregar Usuario"
+            }
             onButtonClick={handleButtonClick}
             showNewButton={true}
           />

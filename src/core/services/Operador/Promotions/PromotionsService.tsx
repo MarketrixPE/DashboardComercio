@@ -131,6 +131,9 @@ export const sendPromotion = async (
     formData.append("latitud", latitud.toString());
     formData.append("longitud", longitud.toString());
     formData.append("promotion_id", promotionId.toString());
+    for (const pair of formData.entries()) {
+      console.log(pair[0] + ": " + pair[1]);
+    }
 
     const response = await commerceClient.post(
       `${API_URL}/notification/sentUsersPromotion`,
